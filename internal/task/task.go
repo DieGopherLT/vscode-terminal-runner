@@ -3,6 +3,7 @@ package task
 import (
 	"fmt"
 
+	"github.com/DieGopherLT/vscode-terminal-runner/pkg/tui"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -29,14 +30,16 @@ type Task struct {
 }
 
 type TaskModel struct {
-	focusIndex int
+	nav        *tui.FormNavigator
 	inputs     []textinput.Model
 }
 
 func NewModel() tea.Model {
+	numberOfFields := 5
 
 	model := &TaskModel{
-		inputs: make([]textinput.Model, 5),
+		inputs: make([]textinput.Model, numberOfFields),
+		nav:    tui.NewNavigator(numberOfFields),
 	}
 
 	for i := range model.inputs {

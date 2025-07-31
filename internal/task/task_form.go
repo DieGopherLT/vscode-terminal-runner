@@ -30,11 +30,11 @@ func (t *TaskModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "up", "down", "tab", "shift+tab":
 			key := msg.String()
-			t.HandleNavigate(key)
+			t.nav.HandleNavigation(key)
 			return t.HandleFocus()
 
 		case "enter":
-			if t.focusIndex != len(t.inputs) {
+			if t.nav.FocusIndex != len(t.inputs) {
 				return t, nil
 			}
 			task := t.HandleTaskCreation()
@@ -50,27 +50,11 @@ func (t *TaskModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return t, cmd
 }
 
-func (t *TaskModel) HandleNavigate(key string) {
-	switch key {
-	case "up", "sift+tab":
-		t.focusIndex--
-	case "down", "tab":
-		t.focusIndex++
-	}
-
-	if t.focusIndex > len(t.inputs) {
-		t.focusIndex = 0
-	} else if t.focusIndex < 0 {
-		t.focusIndex = len(t.inputs)
-	}
-
-}
-
 func (t *TaskModel) HandleFocus() (tea.Model, tea.Cmd) {
 	cmds := make([]tea.Cmd, len(t.inputs))
 
 	for i := 0; i < len(t.inputs); i++ {
-		if i == t.focusIndex {
+		if i == t.nav.FocusIndex {
 			cmds[i] = t.inputs[i].Focus()
 			t.inputs[i].PromptStyle = focusedStyle
 			t.inputs[i].TextStyle = focusedStyle
@@ -105,7 +89,7 @@ func (t *TaskModel) View() string {
 	}
 
 	button := &blurredButton
-	if t.focusIndex == len(t.inputs) {
+	if t.nav.FocusIndex == len(t.inputs) {
 		button = &focusedButton
 	}
 	fmt.Fprintf(&b, "\n\n%s\n\n", *button)
