@@ -1,11 +1,10 @@
 package task
 
 import (
-	"fmt"
-	"strings"
-
+	"github.com/DieGopherLT/vscode-terminal-runner/pkg/styles"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 const (
@@ -56,8 +55,8 @@ func (t *TaskModel) HandleFocus() (tea.Model, tea.Cmd) {
 	for i := 0; i < len(t.inputs); i++ {
 		if i == t.nav.FocusIndex {
 			cmds[i] = t.inputs[i].Focus()
-			t.inputs[i].PromptStyle = focusedStyle
-			t.inputs[i].TextStyle = focusedStyle
+			t.inputs[i].PromptStyle = styles.FocusedInputStyle
+			t.inputs[i].TextStyle = styles.FocusedInputStyle
 			continue
 		}
 		t.inputs[i].Blur()
@@ -79,20 +78,38 @@ func (t *TaskModel) HandleInput(msg tea.Msg) tea.Cmd {
 }
 
 func (t *TaskModel) View() string {
-	b := strings.Builder{}
-
+	var sections []string
+	
+	sections = append(sections, styles.RenderTitle("CREATE TASK"))
+	
+	labels := []string{
+		"Task Name:",
+		"Project Path:",
+		"Commands:",
+		"Icon:",
+		"Icon Color:",
+	}
+	
 	for i := range t.inputs {
-		b.WriteString(t.inputs[i].View())
-		if i < len(t.inputs)-1 {
-			b.WriteRune('\n')
-		}
+		fieldContent := lipgloss.JoinVertical(
+			lipgloss.Left,
+			styles.FieldLabelStyle.Render(labels[i]),
+			t.inputs[i].View(),
+		)
+		sections = append(sections, styles.FieldContainerStyle.Render(fieldContent))
 	}
-
-	button := &blurredButton
+	
+	button := styles.RenderBlurredButton("Submit")
 	if t.nav.FocusIndex == len(t.inputs) {
-		button = &focusedButton
+		button = styles.RenderFocusedButton("Submit")
 	}
-	fmt.Fprintf(&b, "\n\n%s\n\n", *button)
-
-	return b.String()
+	
+	sections = append(sections, button)
+	
+	helpText := styles.HelpTextStyle.Render("↑/↓ navigate • enter submit • esc quit")
+	sections = append(sections, helpText)
+	
+	return styles.FormContainerStyle.Render(
+		lipgloss.JoinVertical(lipgloss.Left, sections...),
+	)
 }

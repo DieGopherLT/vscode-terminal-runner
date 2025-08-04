@@ -1,8 +1,7 @@
 package task
 
 import (
-	"fmt"
-
+	"github.com/DieGopherLT/vscode-terminal-runner/pkg/styles"
 	"github.com/DieGopherLT/vscode-terminal-runner/pkg/tui"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -10,15 +9,7 @@ import (
 )
 
 var (
-	focusedStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
-	blurredStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
-	cursorStyle         = focusedStyle
-	noStyle             = lipgloss.NewStyle()
-	helpStyle           = blurredStyle
-	cursorModeHelpStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
-
-	focusedButton = focusedStyle.Render("[ Submit ]")
-	blurredButton = fmt.Sprintf("[ %s ]", blurredStyle.Render("Submit"))
+	noStyle = lipgloss.NewStyle()
 )
 
 type Task struct {
@@ -44,23 +35,25 @@ func NewModel() tea.Model {
 
 	for i := range model.inputs {
 		t := textinput.New()
-		t.Cursor.Style = cursorStyle
-		t.Width = 50  // Agregar width fijo
+		t.Cursor.Style = styles.FocusedInputStyle
+		t.Width = 60
+		t.Prompt = ""  // Sin prompt, usaremos labels externos
+		t.PlaceholderStyle = styles.PlaceholderStyle
 
 		switch i {
 		case nameField:
-			t.Placeholder = "Task name"
+			t.Placeholder = "Enter task name..."
 			t.Focus()
-			t.PromptStyle = focusedStyle
-			t.TextStyle = focusedStyle
+			t.PromptStyle = styles.FocusedInputStyle
+			t.TextStyle = styles.FocusedInputStyle
 		case pathField:
-			t.Placeholder = "Path"
+			t.Placeholder = "e.g., /home/user/project"
 		case cmdsField:
-			t.Placeholder = "Commands"
+			t.Placeholder = "npm start"
 		case iconField:
-			t.Placeholder = "Icon"
+			t.Placeholder = "🚀"
 		case iconColorField:
-			t.Placeholder = "Icon color"
+			t.Placeholder = "#007ACC"
 		}
 		model.inputs[i] = t
 	}
