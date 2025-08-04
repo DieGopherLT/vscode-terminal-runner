@@ -4,10 +4,9 @@ Copyright © 2025 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-	"os"
+	"fmt"
 
 	"github.com/DieGopherLT/vscode-terminal-runner/internal/task"
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 )
 
@@ -15,22 +14,18 @@ import (
 var taskCmd = &cobra.Command{
 	Use:   "task",
 	Short: "TUI to manage projects",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Long: `Interactive TUI to manage all tasks operations`,
 	Run: func(cmd *cobra.Command, args []string) {
-		p := tea.NewProgram(task.NewModel())
-		if _, err := p.Run(); err != nil {
-			os.Exit(1)
-		}
+		fmt.Println("Interactive TUI to manage all tasks operations")
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(taskCmd)
+	
+	taskCmd.AddCommand(task.CreateCmd)
+	taskCmd.AddCommand(task.ListCmd)
+	taskCmd.AddCommand(task.DeleteCmd)
 
 	// Here you will define your flags and configuration settings.
 
