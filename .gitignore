@@ -34,3 +34,8 @@ go.work.sum
 # Binaries
 vsct
 vscode-terminal-runner
+
+# AI Files
+.github/copilot-instructions.md
+.github/instructions/*.md
+CLAUDE.md

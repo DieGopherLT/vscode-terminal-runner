@@ -33,6 +33,25 @@ var (
 			Foreground(LightGray).
 			MarginTop(1)
 
+	// Suggestion styles
+	SuggestionContainerStyle = lipgloss.NewStyle().
+					Background(lipgloss.Color("#1a1a1a")).
+					Foreground(LightGray).
+					Border(lipgloss.RoundedBorder()).
+					BorderForeground(lipgloss.Color("#333333")).
+					Padding(0, 1).
+					MarginTop(0).
+					Width(58)
+
+	SuggestionItemStyle = lipgloss.NewStyle().
+				Foreground(LightGray).
+				PaddingLeft(1)
+
+	SuggestionHighlightStyle = lipgloss.NewStyle().
+					Foreground(VSCodeBlue).
+					Bold(true).
+					PaddingLeft(1)
+
 	// Title styles
 	TitleStyle = lipgloss.NewStyle().
 			Foreground(VSCodeBlue).

@@ -51,9 +51,12 @@ func NewModel() tea.Model {
 		case cmdsField:
 			t.Placeholder = "npm start"
 		case iconField:
-			t.Placeholder = "🚀"
+			t.Placeholder = "e.g., terminal-bash"
+			t.ShowSuggestions = true
 		case iconColorField:
-			t.Placeholder = "#007ACC"
+			t.Placeholder = "terminal color (e.g., terminal.ansiGreen)"
+			t.Prompt = "terminal.ansi"
+			t.ShowSuggestions = true
 		}
 		model.inputs[i] = t
 	}
