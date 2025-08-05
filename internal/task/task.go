@@ -21,8 +21,9 @@ type Task struct {
 }
 
 type TaskModel struct {
-	nav        *tui.FormNavigator
-	inputs     []textinput.Model
+	nav              *tui.FormNavigator
+	inputs           []textinput.Model
+	suggestionIndex  int  // Índice de la sugerencia seleccionada
 }
 
 func NewModel() tea.Model {
@@ -54,8 +55,7 @@ func NewModel() tea.Model {
 			t.Placeholder = "e.g., terminal-bash"
 			t.ShowSuggestions = true
 		case iconColorField:
-			t.Placeholder = "terminal color (e.g., terminal.ansiGreen)"
-			t.Prompt = "terminal.ansi"
+			t.Placeholder = "terminal.<color> (e.g., terminal.ansiGreen)"
 			t.ShowSuggestions = true
 		}
 		model.inputs[i] = t

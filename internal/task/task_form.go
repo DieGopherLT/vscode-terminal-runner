@@ -33,10 +33,40 @@ func (t *TaskModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "up", "down", "tab", "shift+tab":
 			key := msg.String()
+			
+			// Si hay sugerencias y Tab, aplicar sugerencia
+			if key == "tab" && t.hasSuggestions() {
+				t.applySuggestion()
+				return t, nil
+			}
+			
 			t.nav.HandleNavigation(key)
+			t.suggestionIndex = 0  // Reset suggestion index when navigating
 			return t.HandleFocus()
 
+		case "ctrl+n":
+			// Navegar hacia abajo en sugerencias (circular)
+			if t.hasSuggestions() {
+				suggestions := t.getVisibleSuggestions()
+				t.suggestionIndex = (t.suggestionIndex + 1) % len(suggestions)
+			}
+			return t, nil
+
+		case "ctrl+b":
+			// Navegar hacia arriba en sugerencias (circular)
+			if t.hasSuggestions() {
+				suggestions := t.getVisibleSuggestions()
+				t.suggestionIndex = (t.suggestionIndex - 1 + len(suggestions)) % len(suggestions)
+			}
+			return t, nil
+
 		case "enter":
+			// Si hay sugerencias, aplicar la seleccionada
+			if t.hasSuggestions() {
+				t.applySuggestion()
+				return t, nil
+			}
+			
 			if t.nav.FocusIndex != len(t.inputs) {
 				return t, nil
 			}
@@ -48,6 +78,7 @@ func (t *TaskModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	// Solo procesar input si no es navegación de sugerencias
 	cmd := t.HandleInput(msg)
 
 	return t, cmd
@@ -76,8 +107,17 @@ func (t *TaskModel) HandleFocus() (tea.Model, tea.Cmd) {
 func (t *TaskModel) HandleInput(msg tea.Msg) tea.Cmd {
 	cmds := make([]tea.Cmd, len(t.inputs))
 
+	// Store previous values to detect actual changes
+	var previousValues []string
+	for i := range t.inputs {
+		previousValues = append(previousValues, t.inputs[i].Value())
+	}
+
 	for i := range t.inputs {
 		t.inputs[i], cmds[i] = t.inputs[i].Update(msg)
+
+		// Only reset suggestion index if content actually changed
+		contentChanged := t.inputs[i].Value() != previousValues[i]
 
 		if i == iconField {
 			iconsNames := lo.Map(vscode.Icons, func(i vscode.Icon, _ int) string { return i.Name })
@@ -85,6 +125,11 @@ func (t *TaskModel) HandleInput(msg tea.Msg) tea.Cmd {
 				return strings.Contains(strings.ToLower(icon), strings.ToLower(t.inputs[i].Value()))
 			})
 			t.inputs[i].SetSuggestions(suggestions)
+			
+			// Reset suggestion index only when input content changes
+			if i == t.nav.FocusIndex && contentChanged {
+				t.suggestionIndex = 0
+			}
 		}
 
 		if i == iconColorField {
@@ -93,10 +138,63 @@ func (t *TaskModel) HandleInput(msg tea.Msg) tea.Cmd {
 				return strings.Contains(strings.ToLower(color), strings.ToLower(t.inputs[i].Value()))
 			})
 			t.inputs[i].SetSuggestions(suggestions)
+			
+			// Reset suggestion index only when input content changes
+			if i == t.nav.FocusIndex && contentChanged {
+				t.suggestionIndex = 0
+			}
 		}
 	}
 
 	return tea.Batch(cmds...)
+}
+
+// hasSuggestions checks if the current focused input has suggestions available
+func (t *TaskModel) hasSuggestions() bool {
+	if t.nav.FocusIndex >= len(t.inputs) {
+		return false
+	}
+	
+	currentInput := t.inputs[t.nav.FocusIndex]
+	if !currentInput.ShowSuggestions || len(currentInput.AvailableSuggestions()) == 0 {
+		return false
+	}
+	
+	// If there's only one suggestion and it's an exact match, don't show suggestions
+	suggestions := currentInput.AvailableSuggestions()
+	if len(suggestions) == 1 && suggestions[0] == currentInput.Value() {
+		return false
+	}
+	
+	return true
+}
+
+// getVisibleSuggestions returns the limited suggestions that are actually shown in the UI
+func (t *TaskModel) getVisibleSuggestions() []string {
+	if !t.hasSuggestions() {
+		return nil
+	}
+	
+	suggestions := t.inputs[t.nav.FocusIndex].AvailableSuggestions()
+	maxSuggestions := 3
+	if len(suggestions) > maxSuggestions {
+		suggestions = suggestions[:maxSuggestions]
+	}
+	return suggestions
+}
+
+// applySuggestion applies the currently selected suggestion to the focused input
+func (t *TaskModel) applySuggestion() {
+	suggestions := t.getVisibleSuggestions()
+	if len(suggestions) == 0 {
+		return
+	}
+	
+	if t.suggestionIndex < len(suggestions) {
+		selectedSuggestion := suggestions[t.suggestionIndex]
+		t.inputs[t.nav.FocusIndex].SetValue(selectedSuggestion)
+		t.suggestionIndex = 0
+	}
 }
 
 func (t *TaskModel) View() string {
@@ -121,18 +219,12 @@ func (t *TaskModel) View() string {
 		
 		// Show suggestions for inputs that have ShowSuggestions enabled
 		if t.inputs[i].ShowSuggestions && len(t.inputs[i].AvailableSuggestions()) > 0 && t.nav.FocusIndex == i {
-			suggestions := t.inputs[i].AvailableSuggestions()
-			
-			// Limit to 3 suggestions max
-			maxSuggestions := 3
-			if len(suggestions) > maxSuggestions {
-				suggestions = suggestions[:maxSuggestions]
-			}
+			suggestions := t.getVisibleSuggestions()
 			
 			var suggestionLines []string
 			for j, suggestion := range suggestions {
-				if j == 0 {
-					// Highlight first suggestion
+				if j == t.suggestionIndex {
+					// Highlight selected suggestion
 					suggestionLines = append(suggestionLines, styles.SuggestionHighlightStyle.Render("• "+suggestion))
 				} else {
 					suggestionLines = append(suggestionLines, styles.SuggestionItemStyle.Render("• "+suggestion))
@@ -160,7 +252,7 @@ func (t *TaskModel) View() string {
 	
 	sections = append(sections, button)
 	
-	helpText := styles.HelpTextStyle.Render("↑/↓ navigate • enter submit • esc quit")
+	helpText := styles.HelpTextStyle.Render("↑/↓ navigate • ctrl+b/n suggestions • tab/enter apply • esc quit")
 	sections = append(sections, helpText)
 	
 	return styles.FormContainerStyle.Render(
