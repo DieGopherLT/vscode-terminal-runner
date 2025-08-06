@@ -1,6 +1,10 @@
 package task
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
+
 	"github.com/DieGopherLT/vscode-terminal-runner/pkg/styles"
 	"github.com/DieGopherLT/vscode-terminal-runner/pkg/tui"
 	"github.com/DieGopherLT/vscode-terminal-runner/pkg/tui/suggestions"
@@ -46,6 +50,7 @@ func (t *TaskModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Reset suggestion managers when navigating between fields
 			t.iconSuggestions.Reset()
 			t.colorSuggestions.Reset()
+			t.pathSuggestions.Reset()
 			return t.HandleFocus()
 
 		case "ctrl+n":
@@ -126,6 +131,12 @@ func (t *TaskModel) HandleInput(msg tea.Msg) tea.Cmd {
 		t.inputs[i], cmds[i] = t.inputs[i].Update(msg)
 
 		// Update suggestion managers based on input changes
+		if i == pathField && i == t.nav.FocusIndex {
+			// For path suggestions, we need to dynamically update the suggestions list
+			// based on the current input to provide filesystem-based autocomplete
+			t.updatePathSuggestions(t.inputs[i].Value())
+		}
+
 		if i == iconField && i == t.nav.FocusIndex {
 			t.iconSuggestions.UpdateFilter(t.inputs[i].Value())
 		}
@@ -199,6 +210,8 @@ func (t *TaskModel) View() string {
 // getCurrentSuggestionManager returns the suggestion manager for the current field.
 func (t *TaskModel) getCurrentSuggestionManager() *suggestions.Manager {
 	switch t.nav.FocusIndex {
+	case pathField:
+		return t.pathSuggestions
 	case iconField:
 		return t.iconSuggestions
 	case iconColorField:
@@ -206,4 +219,59 @@ func (t *TaskModel) getCurrentSuggestionManager() *suggestions.Manager {
 	default:
 		return nil
 	}
+}
+
+// updatePathSuggestions dynamically updates path suggestions based on filesystem
+func (t *TaskModel) updatePathSuggestions(input string) {
+	// Only regenerate suggestions when the directory context changes
+	// This prevents resetting the selection index on every keystroke
+	currentDir := t.getDirectoryContext(input)
+	
+	// Check if we need to regenerate suggestions (directory changed)
+	if t.shouldRegeneratePaths(currentDir, input) {
+		dirSuggestions := suggestions.GetDirectorySuggestions(input)
+		t.pathSuggestions.SetSuggestions(dirSuggestions)
+		t.lastPathDirectory = currentDir
+	}
+	
+	// Always update filter for real-time filtering
+	t.pathSuggestions.UpdateFilter(input)
+}
+
+// getDirectoryContext extracts the directory portion of the input path
+func (t *TaskModel) getDirectoryContext(input string) string {
+	if input == "" {
+		return "."
+	}
+	
+	// Expand ~ to home directory for comparison
+	expanded := input
+	if strings.HasPrefix(input, "~/") || input == "~" {
+		if home, err := os.UserHomeDir(); err == nil {
+			if input == "~" {
+				expanded = home
+			} else {
+				expanded = filepath.Join(home, input[2:])
+			}
+		}
+	}
+	
+	// If ends with separator or is current/parent dir, use as-is
+	if strings.HasSuffix(expanded, string(filepath.Separator)) || expanded == "." || expanded == ".." {
+		return expanded
+	}
+	
+	// Otherwise return the directory part
+	return filepath.Dir(expanded)
+}
+
+// shouldRegeneratePaths determines if we need to regenerate the suggestions list
+func (t *TaskModel) shouldRegeneratePaths(currentDir, input string) bool {
+	// Always regenerate on first run
+	if t.lastPathDirectory == "" {
+		return true
+	}
+	
+	// Regenerate if directory context changed
+	return t.lastPathDirectory != currentDir
 }

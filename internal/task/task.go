@@ -31,7 +31,9 @@ type TaskModel struct {
 	inputs             []textinput.Model
 	iconSuggestions    *suggestions.Manager
 	colorSuggestions   *suggestions.Manager
+	pathSuggestions    *suggestions.Manager
 	messages           *messages.MessageManager
+	lastPathDirectory  string
 }
 
 // NewModel initializes and returns the TUI model for the task creation form.
@@ -47,6 +49,7 @@ func NewModel() tea.Model {
 		nav:              tui.NewNavigator(numberOfFields),
 		iconSuggestions:  suggestions.NewManager(iconNames, 3, suggestions.ContainsFilter),
 		colorSuggestions: suggestions.NewManager(colorNames, 3, suggestions.ContainsFilter),
+		pathSuggestions:  suggestions.NewManagerWithOptions([]string{}, 5, suggestions.PathDirectoryFilter, false),
 		messages:         messages.NewManager(),
 	}
 

@@ -18,10 +18,16 @@ type Manager struct {
 	maxVisible          int        // Maximum suggestions to show
 	filterFunc          FilterFunc // Function to filter suggestions
 	lastInput           string     // Last input used for filtering
+	showOnEmpty         bool       // Whether to show suggestions when input is empty
 }
 
-// NewManager creates a new suggestion manager
+// NewManager creates a new suggestion manager (shows suggestions on empty input by default)
 func NewManager(suggestions []string, maxVisible int, filterFunc FilterFunc) *Manager {
+	return NewManagerWithOptions(suggestions, maxVisible, filterFunc, true)
+}
+
+// NewManagerWithOptions creates a new suggestion manager with custom options
+func NewManagerWithOptions(suggestions []string, maxVisible int, filterFunc FilterFunc, showOnEmpty bool) *Manager {
 	if filterFunc == nil {
 		filterFunc = StartsWithFilter
 	}
@@ -32,6 +38,7 @@ func NewManager(suggestions []string, maxVisible int, filterFunc FilterFunc) *Ma
 		selectedIndex:       0,
 		maxVisible:          maxVisible,
 		filterFunc:          filterFunc,
+		showOnEmpty:         showOnEmpty,
 	}
 }
 
@@ -105,6 +112,11 @@ func (sm *Manager) GetVisible() []string {
 
 // ShouldShow determines if suggestions should be shown based on current state and input
 func (sm *Manager) ShouldShow(input string) bool {
+	// Don't show if configured not to show on empty input
+	if !sm.showOnEmpty && input == "" {
+		return false
+	}
+
 	visible := sm.GetVisible()
 
 	// Don't show if no suggestions
@@ -125,6 +137,7 @@ func (sm *Manager) ApplySelected(input *textinput.Model) {
 	selected := sm.GetSelected()
 	if selected != "" {
 		input.SetValue(selected)
+		input.SetCursor(len(selected)) // Move cursor to end of applied suggestion
 		sm.Reset()
 	}
 }

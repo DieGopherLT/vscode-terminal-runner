@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/DieGopherLT/vscode-terminal-runner/internal/vscode"
@@ -70,14 +71,19 @@ func (t *TaskModel) isValidTask(task Task) bool {
 	}
 
 	p := strings.TrimSpace(task.Path)
-	if strings.HasSuffix(p, ".") {
-		relativePath := path.Join(os.Getenv("PWD"), p)
-		if _, err := os.Stat(relativePath); os.IsNotExist(err) {
-			t.messages.AddError("Path does not exist")
-		}
-	} else {
-		if _, err := os.Stat(p); os.IsNotExist(err) {
-			t.messages.AddError("Path does not exist")
+	if p != "" {
+		// Expand ~ to home directory for validation
+		expandedPath := t.expandPathForValidation(p)
+		
+		if strings.HasSuffix(p, ".") {
+			relativePath := path.Join(os.Getenv("PWD"), expandedPath)
+			if _, err := os.Stat(relativePath); os.IsNotExist(err) {
+				t.messages.AddError("Path does not exist")
+			}
+		} else {
+			if _, err := os.Stat(expandedPath); os.IsNotExist(err) {
+				t.messages.AddError("Path does not exist")
+			}
 		}
 	}
 
@@ -144,4 +150,19 @@ func DeleteTask(name string) error {
 	file.Seek(0, 0)
 	_, err = file.Write(encoded)
 	return err
+}
+
+// expandPathForValidation expands ~ to home directory for path validation
+func (t *TaskModel) expandPathForValidation(path string) string {
+	if strings.HasPrefix(path, "~/") || path == "~" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return path // Return original if can't get home
+		}
+		if path == "~" {
+			return home
+		}
+		return filepath.Join(home, path[2:])
+	}
+	return path
 }
