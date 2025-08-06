@@ -1,14 +1,12 @@
 package task
 
 import (
-	"strings"
-
-	"github.com/DieGopherLT/vscode-terminal-runner/internal/vscode"
 	"github.com/DieGopherLT/vscode-terminal-runner/pkg/styles"
+	"github.com/DieGopherLT/vscode-terminal-runner/pkg/tui"
+	"github.com/DieGopherLT/vscode-terminal-runner/pkg/tui/suggestions"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/samber/lo"
 )
 
 const (
@@ -31,39 +29,41 @@ func (t *TaskModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c", "esc":
 			return t, tea.Quit
 
-		case "up", "down", "tab", "shift+tab":
+		case string(tui.KeyUp), string(tui.KeyDown), string(tui.KeyTab), string(tui.KeyShiftTab):
 			key := msg.String()
 			
-			// Si hay sugerencias y Tab, aplicar sugerencia
-			if key == "tab" && t.hasSuggestions() {
-				t.applySuggestion()
-				return t, nil
+			// If there are suggestions and Tab pressed, apply suggestion
+			if key == string(tui.KeyTab) {
+				if manager := t.getCurrentSuggestionManager(); manager != nil && manager.ShouldShow(t.inputs[t.nav.FocusIndex].Value()) {
+					manager.ApplySelected(&t.inputs[t.nav.FocusIndex])
+					return t, nil
+				}
 			}
 			
 			t.nav.HandleNavigation(key)
-			t.suggestionIndex = 0  // Reset suggestion index when navigating
+			// Reset suggestion managers when navigating between fields
+			t.iconSuggestions.Reset()
+			t.colorSuggestions.Reset()
 			return t.HandleFocus()
 
 		case "ctrl+n":
-			// Navegar hacia abajo en sugerencias (circular)
-			if t.hasSuggestions() {
-				suggestions := t.getVisibleSuggestions()
-				t.suggestionIndex = (t.suggestionIndex + 1) % len(suggestions)
+			// Navigate down through suggestions (circular)
+			if manager := t.getCurrentSuggestionManager(); manager != nil {
+				manager.Next()
 			}
 			return t, nil
 
 		case "ctrl+b":
-			// Navegar hacia arriba en sugerencias (circular)
-			if t.hasSuggestions() {
-				suggestions := t.getVisibleSuggestions()
-				t.suggestionIndex = (t.suggestionIndex - 1 + len(suggestions)) % len(suggestions)
+			// Navigate up through suggestions (circular)
+			if manager := t.getCurrentSuggestionManager(); manager != nil {
+				manager.Previous()
 			}
 			return t, nil
 
 		case "enter":
-			// Si hay sugerencias, aplicar la seleccionada
-			if t.hasSuggestions() {
-				t.applySuggestion()
+			// If there are suggestions, apply the selected one
+			if manager := t.getCurrentSuggestionManager(); manager != nil && manager.ShouldShow(t.inputs[t.nav.FocusIndex].Value()) {
+				manager.ApplySelected(&t.inputs[t.nav.FocusIndex])
 				return t, nil
 			}
 			
@@ -78,7 +78,7 @@ func (t *TaskModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// Solo procesar input si no es navegación de sugerencias
+	// Only process input if it's not suggestion navigation
 	cmd := t.HandleInput(msg)
 
 	return t, cmd
@@ -107,93 +107,31 @@ func (t *TaskModel) HandleFocus() (tea.Model, tea.Cmd) {
 func (t *TaskModel) HandleInput(msg tea.Msg) tea.Cmd {
 	cmds := make([]tea.Cmd, len(t.inputs))
 
-	// Store previous values to detect actual changes
-	var previousValues []string
-	for i := range t.inputs {
-		previousValues = append(previousValues, t.inputs[i].Value())
-	}
-
 	for i := range t.inputs {
 		t.inputs[i], cmds[i] = t.inputs[i].Update(msg)
 
-		// Only reset suggestion index if content actually changed
-		contentChanged := t.inputs[i].Value() != previousValues[i]
-
-		if i == iconField {
-			iconsNames := lo.Map(vscode.Icons, func(i vscode.Icon, _ int) string { return i.Name })
-			suggestions := lo.Filter(iconsNames, func(icon string, _ int) bool {
-				return strings.Contains(strings.ToLower(icon), strings.ToLower(t.inputs[i].Value()))
-			})
-			t.inputs[i].SetSuggestions(suggestions)
-			
-			// Reset suggestion index only when input content changes
-			if i == t.nav.FocusIndex && contentChanged {
-				t.suggestionIndex = 0
-			}
+		// Update suggestion managers based on input changes
+		if i == iconField && i == t.nav.FocusIndex {
+			t.iconSuggestions.UpdateFilter(t.inputs[i].Value())
 		}
 
-		if i == iconColorField {
-			colorsNames := lo.Map(vscode.ANSIColors, func(c vscode.ANSIColor, _ int) string { return c.Name })
-			suggestions := lo.Filter(colorsNames, func(color string, _ int) bool {
-				return strings.Contains(strings.ToLower(color), strings.ToLower(t.inputs[i].Value()))
-			})
-			t.inputs[i].SetSuggestions(suggestions)
-			
-			// Reset suggestion index only when input content changes
-			if i == t.nav.FocusIndex && contentChanged {
-				t.suggestionIndex = 0
-			}
+		if i == iconColorField && i == t.nav.FocusIndex {
+			t.colorSuggestions.UpdateFilter(t.inputs[i].Value())
 		}
 	}
 
 	return tea.Batch(cmds...)
 }
 
-// hasSuggestions checks if the current focused input has suggestions available
-func (t *TaskModel) hasSuggestions() bool {
-	if t.nav.FocusIndex >= len(t.inputs) {
-		return false
-	}
-	
-	currentInput := t.inputs[t.nav.FocusIndex]
-	if !currentInput.ShowSuggestions || len(currentInput.AvailableSuggestions()) == 0 {
-		return false
-	}
-	
-	// If there's only one suggestion and it's an exact match, don't show suggestions
-	suggestions := currentInput.AvailableSuggestions()
-	if len(suggestions) == 1 && suggestions[0] == currentInput.Value() {
-		return false
-	}
-	
-	return true
-}
-
-// getVisibleSuggestions returns the limited suggestions that are actually shown in the UI
-func (t *TaskModel) getVisibleSuggestions() []string {
-	if !t.hasSuggestions() {
+// getCurrentSuggestionManager returns the appropriate suggestion manager for the current field
+func (t *TaskModel) getCurrentSuggestionManager() *suggestions.Manager {
+	switch t.nav.FocusIndex {
+	case iconField:
+		return t.iconSuggestions
+	case iconColorField:
+		return t.colorSuggestions
+	default:
 		return nil
-	}
-	
-	suggestions := t.inputs[t.nav.FocusIndex].AvailableSuggestions()
-	maxSuggestions := 3
-	if len(suggestions) > maxSuggestions {
-		suggestions = suggestions[:maxSuggestions]
-	}
-	return suggestions
-}
-
-// applySuggestion applies the currently selected suggestion to the focused input
-func (t *TaskModel) applySuggestion() {
-	suggestions := t.getVisibleSuggestions()
-	if len(suggestions) == 0 {
-		return
-	}
-	
-	if t.suggestionIndex < len(suggestions) {
-		selectedSuggestion := suggestions[t.suggestionIndex]
-		t.inputs[t.nav.FocusIndex].SetValue(selectedSuggestion)
-		t.suggestionIndex = 0
 	}
 }
 
@@ -217,29 +155,18 @@ func (t *TaskModel) View() string {
 			t.inputs[i].View(),
 		)
 		
-		// Show suggestions for inputs that have ShowSuggestions enabled
-		if t.inputs[i].ShowSuggestions && len(t.inputs[i].AvailableSuggestions()) > 0 && t.nav.FocusIndex == i {
-			suggestions := t.getVisibleSuggestions()
-			
-			var suggestionLines []string
-			for j, suggestion := range suggestions {
-				if j == t.suggestionIndex {
-					// Highlight selected suggestion
-					suggestionLines = append(suggestionLines, styles.SuggestionHighlightStyle.Render("• "+suggestion))
-				} else {
-					suggestionLines = append(suggestionLines, styles.SuggestionItemStyle.Render("• "+suggestion))
+		// Show suggestions for the current focused field
+		if t.nav.FocusIndex == i {
+			if manager := t.getCurrentSuggestionManager(); manager != nil && manager.ShouldShow(t.inputs[i].Value()) {
+				suggestionBox := manager.Render()
+				if suggestionBox != "" {
+					fieldContent = lipgloss.JoinVertical(
+						lipgloss.Left,
+						fieldContent,
+						suggestionBox,
+					)
 				}
 			}
-			
-			suggestionBox := styles.SuggestionContainerStyle.Render(
-				lipgloss.JoinVertical(lipgloss.Left, suggestionLines...),
-			)
-			
-			fieldContent = lipgloss.JoinVertical(
-				lipgloss.Left,
-				fieldContent,
-				suggestionBox,
-			)
 		}
 		
 		sections = append(sections, styles.FieldContainerStyle.Render(fieldContent))
