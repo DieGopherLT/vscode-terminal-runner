@@ -135,11 +135,12 @@ func (sm *Manager) ShouldShow(input string) bool {
 // ApplySelected applies the selected suggestion to the given textinput
 func (sm *Manager) ApplySelected(input *textinput.Model) {
 	selected := sm.GetSelected()
-	if selected != "" {
-		input.SetValue(selected)
-		input.SetCursor(len(selected)) // Move cursor to end of applied suggestion
-		sm.Reset()
+	if selected == "" {
+		return
 	}
+	input.SetValue(selected)
+	input.SetCursor(len(selected))
+	sm.Reset()
 }
 
 // Render returns the rendered suggestions as a string
@@ -149,15 +150,12 @@ func (sm *Manager) Render() string {
 		return ""
 	}
 
-	var suggestionLines []string
-	for i, suggestion := range visible {
+	suggestionLines := lo.Map(visible, func(suggestion string, i int) string {
 		if i == sm.selectedIndex {
-			// Highlight selected suggestion
-			suggestionLines = append(suggestionLines, styles.SuggestionHighlightStyle.Render("• "+suggestion))
-		} else {
-			suggestionLines = append(suggestionLines, styles.SuggestionItemStyle.Render("• "+suggestion))
+			return styles.SuggestionHighlightStyle.Render("• " + suggestion)
 		}
-	}
+		return styles.SuggestionItemStyle.Render("• " + suggestion)
+	})
 
 	return styles.SuggestionContainerStyle.Render(
 		lipgloss.JoinVertical(lipgloss.Left, suggestionLines...),
