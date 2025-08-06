@@ -2,6 +2,7 @@ package task
 
 import (
 	"github.com/DieGopherLT/vscode-terminal-runner/internal/vscode"
+	"github.com/DieGopherLT/vscode-terminal-runner/pkg/messages"
 	"github.com/DieGopherLT/vscode-terminal-runner/pkg/styles"
 	"github.com/DieGopherLT/vscode-terminal-runner/pkg/tui"
 	"github.com/DieGopherLT/vscode-terminal-runner/pkg/tui/suggestions"
@@ -15,21 +16,25 @@ var (
 	noStyle = lipgloss.NewStyle()
 )
 
+// Task represents an individual task that can be executed in a VSCode terminal.
 type Task struct {
-	Name      string   `json:"name"`
-	Path      string   `json:"path"`
-	Cmds      []string `json:"cmds"`
-	Icon      string   `json:"icon"`
-	IconColor string   `json:"iconColor"`
+	Name      string   `json:"name"`      // Task name
+	Path      string   `json:"path"`      // Associated project path
+	Cmds      []string `json:"cmds"`      // Commands to execute
+	Icon      string   `json:"icon"`      // VSCode terminal icon
+	IconColor string   `json:"iconColor"` // Icon color in the terminal
 }
 
+// TaskModel manages the state and logic of the TUI form for creating/editing tasks.
 type TaskModel struct {
 	nav                *tui.FormNavigator
 	inputs             []textinput.Model
 	iconSuggestions    *suggestions.Manager
 	colorSuggestions   *suggestions.Manager
+	messages           *messages.MessageManager
 }
 
+// NewModel initializes and returns the TUI model for the task creation form.
 func NewModel() tea.Model {
 	numberOfFields := 5
 
@@ -40,8 +45,9 @@ func NewModel() tea.Model {
 	model := &TaskModel{
 		inputs:           make([]textinput.Model, numberOfFields),
 		nav:              tui.NewNavigator(numberOfFields),
-		iconSuggestions:  suggestions.NewManager(iconNames, 3, nil),
+		iconSuggestions:  suggestions.NewManager(iconNames, 3, suggestions.ContainsFilter),
 		colorSuggestions: suggestions.NewManager(colorNames, 3, suggestions.ContainsFilter),
+		messages:         messages.NewManager(),
 	}
 
 	for i := range model.inputs {
@@ -58,7 +64,7 @@ func NewModel() tea.Model {
 			t.PromptStyle = styles.FocusedInputStyle
 			t.TextStyle = styles.FocusedInputStyle
 		case pathField:
-			t.Placeholder = "e.g., /home/user/project"
+			t.Placeholder = "e.g., /home/user/project, absolute path or relative cwd"
 		case cmdsField:
 			t.Placeholder = "cmd1, cmd2... (e.g., yarn install, yarn dev)"
 		case iconField:

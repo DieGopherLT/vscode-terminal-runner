@@ -1,19 +1,22 @@
 package tui
 
+// FormNavigator manages focus and navigation between elements in a TUI form.
 type FormNavigator struct {
-	FocusIndex   int
-	elementCount int
+	FocusIndex   int // Index of the currently focused element
+	elementCount int // Total number of navigable elements
 }
 
+// NavigationKeys represents the supported navigation keys.
 type NavigationKeys string
 
 const (
-	KeyUp       NavigationKeys = "up"
-	KeyDown     NavigationKeys = "down"
-	KeyTab      NavigationKeys = "tab"
-	KeyShiftTab NavigationKeys = "shift+tab"
+	KeyUp       NavigationKeys = "up"        // Navigate up
+	KeyDown     NavigationKeys = "down"      // Navigate down
+	KeyTab      NavigationKeys = "tab"       // Navigate to the next element
+	KeyShiftTab NavigationKeys = "shift+tab" // Navigate to the previous element
 )
 
+// NewNavigator creates a new FormNavigator for a form with the given number of elements.
 func NewNavigator(elementCount int) *FormNavigator {
 	return &FormNavigator{
 		FocusIndex:   0,
@@ -21,6 +24,7 @@ func NewNavigator(elementCount int) *FormNavigator {
 	}
 }
 
+// HandleNavigation updates the focus index according to the received navigation key.
 func (n *FormNavigator) HandleNavigation(key string) {
 	switch NavigationKeys(key) {
 	case KeyUp, KeyShiftTab:

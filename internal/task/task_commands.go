@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// CreateCmd starts the TUI form to create a new task.
 var CreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a new task",
@@ -20,6 +21,7 @@ var CreateCmd = &cobra.Command{
 	},
 }
 
+// ListCmd displays the list of configured tasks.
 var ListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all tasks",
@@ -29,6 +31,7 @@ var ListCmd = &cobra.Command{
 	},
 }
 
+// DeleteCmd deletes a task specified by name.
 var DeleteCmd = &cobra.Command{
 	Use:   "delete <name>",
 	Short: "Delete a task",

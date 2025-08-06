@@ -10,17 +10,19 @@ import (
 )
 
 const (
-	nameField      = 0
-	pathField      = 1
-	cmdsField      = 2
-	iconField      = 3
-	iconColorField = 4
+	nameField      = 0 // Name field index
+	pathField      = 1 // Path field index
+	cmdsField      = 2 // Commands field index
+	iconField      = 3 // Icon field index
+	iconColorField = 4 // Icon color field index
 )
 
+// Init initializes the TUI model (cursor blinking).
 func (t *TaskModel) Init() tea.Cmd {
 	return textinput.Blink
 }
 
+// Update handles messages received by the TUI model and updates the form state.
 func (t *TaskModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
@@ -70,10 +72,16 @@ func (t *TaskModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if t.nav.FocusIndex != len(t.inputs) {
 				return t, nil
 			}
-			task := t.HandleTaskCreation()
-			if err := SaveTask(task); err != nil {
+			task := t.handleTaskCreation()
+
+			if !t.isValidTask(task) {
+				return t, nil
+			}
+
+			if err := t.saveTask(task); err != nil {
 				return t, tea.Quit
 			}
+			t.messages.AddSuccess("Task created successfully!")
 			return t, tea.Quit
 		}
 	}
@@ -84,6 +92,7 @@ func (t *TaskModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return t, cmd
 }
 
+// HandleFocus updates the visual focus and style of the form fields.
 func (t *TaskModel) HandleFocus() (tea.Model, tea.Cmd) {
 	cmds := make([]tea.Cmd, len(t.inputs))
 
@@ -104,8 +113,14 @@ func (t *TaskModel) HandleFocus() (tea.Model, tea.Cmd) {
 	return t, tea.Batch(cmds...)
 }
 
+// HandleInput processes text input and updates the suggestion managers.
 func (t *TaskModel) HandleInput(msg tea.Msg) tea.Cmd {
 	cmds := make([]tea.Cmd, len(t.inputs))
+
+	// Clear messages when user starts typing
+	if t.messages.HasMessages() {
+		t.messages.Clear()
+	}
 
 	for i := range t.inputs {
 		t.inputs[i], cmds[i] = t.inputs[i].Update(msg)
@@ -123,18 +138,7 @@ func (t *TaskModel) HandleInput(msg tea.Msg) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
-// getCurrentSuggestionManager returns the appropriate suggestion manager for the current field
-func (t *TaskModel) getCurrentSuggestionManager() *suggestions.Manager {
-	switch t.nav.FocusIndex {
-	case iconField:
-		return t.iconSuggestions
-	case iconColorField:
-		return t.colorSuggestions
-	default:
-		return nil
-	}
-}
-
+// View renders the TUI form view for creating/editing tasks.
 func (t *TaskModel) View() string {
 	var sections []string
 	
@@ -172,6 +176,11 @@ func (t *TaskModel) View() string {
 		sections = append(sections, styles.FieldContainerStyle.Render(fieldContent))
 	}
 	
+	// Render messages if any exist
+	if t.messages.HasMessages() {
+		sections = append(sections, t.messages.Render())
+	}
+	
 	button := styles.RenderBlurredButton("Submit")
 	if t.nav.FocusIndex == len(t.inputs) {
 		button = styles.RenderFocusedButton("Submit")
@@ -185,4 +194,16 @@ func (t *TaskModel) View() string {
 	return styles.FormContainerStyle.Render(
 		lipgloss.JoinVertical(lipgloss.Left, sections...),
 	)
+}
+
+// getCurrentSuggestionManager returns the suggestion manager for the current field.
+func (t *TaskModel) getCurrentSuggestionManager() *suggestions.Manager {
+	switch t.nav.FocusIndex {
+	case iconField:
+		return t.iconSuggestions
+	case iconColorField:
+		return t.colorSuggestions
+	default:
+		return nil
+	}
 }
