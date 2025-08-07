@@ -27,7 +27,19 @@ var ListCmd = &cobra.Command{
 	Short: "List all tasks",
 	Long:  `Display a list of all configured tasks`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// Lógica para listar tareas
+		onlyNames, _ := cmd.Flags().GetBool("only-names")
+
+		if onlyNames {
+			err := listAllTaskNames()
+			if err != nil {
+				fmt.Println("Error listing task names:", err)
+			}
+			return
+		}
+
+		if err := listAllTasks(); err != nil {
+			fmt.Println("Error listing tasks:", err)
+		}
 	},
 }
 
@@ -41,4 +53,8 @@ var DeleteCmd = &cobra.Command{
 		taskName := args[0]
 		fmt.Println("Deleting task:", taskName)
 	},
+}
+
+func init() {
+	ListCmd.Flags().BoolP("only-names", "n", false, "List only task names")
 }
