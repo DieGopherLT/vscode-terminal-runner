@@ -1,7 +1,6 @@
 package task
 
 import (
-	"github.com/DieGopherLT/vscode-terminal-runner/internal/vscode"
 	"github.com/DieGopherLT/vscode-terminal-runner/pkg/messages"
 	"github.com/DieGopherLT/vscode-terminal-runner/pkg/styles"
 	"github.com/DieGopherLT/vscode-terminal-runner/pkg/tui"
@@ -16,14 +15,6 @@ var (
 	noStyle = lipgloss.NewStyle()
 )
 
-// Task represents an individual task that can be executed in a VSCode terminal.
-type Task struct {
-	Name      string   `json:"name"`      // Task name
-	Path      string   `json:"path"`      // Associated project path
-	Cmds      []string `json:"cmds"`      // Commands to execute
-	Icon      string   `json:"icon"`      // VSCode terminal icon
-	IconColor string   `json:"iconColor"` // Icon color in the terminal
-}
 
 // TaskModel manages the state and logic of the TUI form for creating/editing tasks.
 type TaskModel struct {
@@ -41,8 +32,8 @@ func NewModel() tea.Model {
 	numberOfFields := 5
 
 	// Create suggestion managers
-	iconNames := lo.Map(vscode.Icons, func(i vscode.Icon, _ int) string { return i.Name })
-	colorNames := lo.Map(vscode.ANSIColors, func(c vscode.ANSIColor, _ int) string { return c.Name })
+	iconNames := lo.Map(styles.VSCodeIcons, func(i styles.VSCodeIcon, _ int) string { return i.Name })
+	colorNames := lo.Map(styles.VSCodeANSIColors, func(c styles.VSCodeANSIColor, _ int) string { return c.Name })
 
 	model := &TaskModel{
 		inputs:           make([]textinput.Model, numberOfFields),

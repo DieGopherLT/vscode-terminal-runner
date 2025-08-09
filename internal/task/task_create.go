@@ -8,7 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/DieGopherLT/vscode-terminal-runner/internal/vscode"
+	"github.com/DieGopherLT/vscode-terminal-runner/internal/models"
+	"github.com/DieGopherLT/vscode-terminal-runner/pkg/styles"
 	"github.com/samber/lo"
 )
 
@@ -16,12 +17,12 @@ var TasksSaveFile = path.Join(os.Getenv("HOME"), ".config/vsct-runner/tasks.json
 
 // TaskSaveFileContent represents the structure of the task persistence file.
 type TaskSaveFileContent struct {
-	Tasks []Task `json:"tasks"`
+	Tasks []models.Task `json:"tasks"`
 }
 
 // handleTaskCreation builds a Task instance from the form values.
-func (t TaskModel) handleTaskCreation() Task {
-	return Task{
+func (t TaskModel) handleTaskCreation() models.Task {
+	return models.Task{
 		Name:      t.inputs[nameField].Value(),
 		Path:      t.inputs[pathField].Value(),
 		Cmds:      strings.Split(t.inputs[cmdsField].Value(), ","),
@@ -31,7 +32,7 @@ func (t TaskModel) handleTaskCreation() Task {
 }
 
 // saveTask saves a task to the local configuration file.
-func (t TaskModel) saveTask(task Task) error {
+func (t TaskModel) saveTask(task models.Task) error {
 	if err := os.MkdirAll(path.Dir(TasksSaveFile), 0755); err != nil {
 		return err
 	}
@@ -64,7 +65,7 @@ func (t TaskModel) saveTask(task Task) error {
 	return os.WriteFile(TasksSaveFile, newJsonContent, 0666)
 }
 
-func (t *TaskModel) isValidTask(task Task) bool {
+func (t *TaskModel) isValidTask(task models.Task) bool {
 
 	if strings.TrimSpace(task.Name) == "" {
 		t.messages.AddError("Name is required")
@@ -91,14 +92,14 @@ func (t *TaskModel) isValidTask(task Task) bool {
 		t.messages.AddError("At least one command is required")
 	}
 
-	_, taskIconExists := lo.Find(vscode.Icons, func(i vscode.Icon) bool {
+	_, taskIconExists := lo.Find(styles.VSCodeIcons, func(i styles.VSCodeIcon) bool {
 		return i.Name == task.Icon
 	})
 	if task.Icon == "" || !taskIconExists {
 		t.messages.AddError("Invalid Icon")
 	}
 
-	_, taskColorExists := lo.Find(vscode.ANSIColors, func(c vscode.ANSIColor) bool {
+	_, taskColorExists := lo.Find(styles.VSCodeANSIColors, func(c styles.VSCodeANSIColor) bool {
 		return c.Name == task.IconColor
 	})
 	if task.IconColor == "" || !taskColorExists {
@@ -137,7 +138,7 @@ func DeleteTask(name string) error {
 		}
 	}
 
-	content.Tasks = lo.Filter(content.Tasks, func(task Task, index int) bool {
+	content.Tasks = lo.Filter(content.Tasks, func(task models.Task, index int) bool {
 		return task.Name != name
 	})
 

@@ -7,9 +7,11 @@ import (
 	"os"
 	"strings"
 	"text/tabwriter"
+
+	"github.com/DieGopherLT/vscode-terminal-runner/internal/models"
 )
 
-func readTasks() ([]Task, error) {
+func readTasks() ([]models.Task, error) {
 	file, err := os.OpenFile(TasksSaveFile, os.O_RDWR|os.O_CREATE, 0666)
 	if err != nil {
 		return nil, err
@@ -80,4 +82,20 @@ func listAllTaskNames() error {
 	}
 	fmt.Println(strBuilder.String())
 	return nil
+}
+
+// FindTaskByName retrieves a task by its name from the saved tasks
+func FindByName(name string) (*models.Task, error) {
+	tasks, err := readTasks()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load tasks: %w", err)
+	}
+
+	for _, task := range tasks {
+		if task.Name == name {
+			return &task, nil
+		}
+	}
+
+	return nil, fmt.Errorf("task '%s' not found", name)
 }
