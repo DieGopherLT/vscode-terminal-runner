@@ -63,10 +63,11 @@ var (
 
 // Message icons for different types
 const (
-	ErrorIcon   = "✗"
-	SuccessIcon = "✓"
-	WarningIcon = "⚠"
-	InfoIcon    = "ℹ"
+	ErrorIcon    = "✖"
+	SuccessIcon  = "✓"
+	WarningIcon  = "⚠"
+	InfoIcon     = "ⓘ"
+	ProgressIcon = "●"
 )
 
 // RenderErrorMessage renders a styled error message with container.

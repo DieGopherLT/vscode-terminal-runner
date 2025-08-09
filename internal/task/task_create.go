@@ -1,24 +1,17 @@
 package task
 
 import (
-	"encoding/json"
-	"io"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
 
 	"github.com/DieGopherLT/vscode-terminal-runner/internal/models"
+	"github.com/DieGopherLT/vscode-terminal-runner/internal/repository"
 	"github.com/DieGopherLT/vscode-terminal-runner/pkg/styles"
 	"github.com/samber/lo"
 )
 
-var TasksSaveFile = path.Join(os.Getenv("HOME"), ".config/vsct-runner/tasks.json")
-
-// TaskSaveFileContent represents the structure of the task persistence file.
-type TaskSaveFileContent struct {
-	Tasks []models.Task `json:"tasks"`
-}
 
 // handleTaskCreation builds a Task instance from the form values.
 func (t TaskModel) handleTaskCreation() models.Task {
@@ -33,36 +26,7 @@ func (t TaskModel) handleTaskCreation() models.Task {
 
 // saveTask saves a task to the local configuration file.
 func (t TaskModel) saveTask(task models.Task) error {
-	if err := os.MkdirAll(path.Dir(TasksSaveFile), 0755); err != nil {
-		return err
-	}
-
-	file, err := os.OpenFile(TasksSaveFile, os.O_RDWR|os.O_CREATE, 0666)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	jsonContent, err := io.ReadAll(file)
-	if err != nil {
-		return err
-	}
-
-	var content TaskSaveFileContent
-	if len(jsonContent) > 0 {
-		if err = json.Unmarshal(jsonContent, &content); err != nil {
-			return err
-		}
-	}
-
-	content.Tasks = append(content.Tasks, task)
-
-	newJsonContent, err := json.Marshal(content)
-	if err != nil {
-		return err
-	}
-
-	return os.WriteFile(TasksSaveFile, newJsonContent, 0666)
+	return repository.SaveTask(task)
 }
 
 func (t *TaskModel) isValidTask(task models.Task) bool {
@@ -115,42 +79,7 @@ func (t *TaskModel) isValidTask(task models.Task) bool {
 
 // DeleteTask removes a task from the local configuration file by name.
 func DeleteTask(name string) error {
-
-	if err := os.MkdirAll(path.Dir(TasksSaveFile), 0755); err != nil {
-		return err
-	}
-
-	file, err := os.OpenFile(TasksSaveFile, os.O_RDWR|os.O_CREATE, 0666)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	jsonContent, err := io.ReadAll(file)
-	if err != nil {
-		return err
-	}
-
-	var content TaskSaveFileContent
-	if len(jsonContent) > 0 {
-		if err = json.Unmarshal(jsonContent, &content); err != nil {
-			return err
-		}
-	}
-
-	content.Tasks = lo.Filter(content.Tasks, func(task models.Task, index int) bool {
-		return task.Name != name
-	})
-
-	encoded, err := json.Marshal(content)
-	if err != nil {
-		return err
-	}
-
-	file.Truncate(0)
-	file.Seek(0, 0)
-	_, err = file.Write(encoded)
-	return err
+	return repository.DeleteTask(name)
 }
 
 // expandPathForValidation expands ~ to home directory for path validation

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/DieGopherLT/vscode-terminal-runner/internal/vscode"
+	"github.com/DieGopherLT/vscode-terminal-runner/pkg/styles"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 )
@@ -52,6 +54,29 @@ var DeleteCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		taskName := args[0]
 		fmt.Println("Deleting task:", taskName)
+	},
+}
+
+var RunCmd = &cobra.Command{
+	Use:   "run <name>",
+	Short: "Run a task",
+	Long:  `Run a task with the specified name`,
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		taskName := args[0]
+
+		runner, err := vscode.NewRunner()
+		if err != nil {
+			styles.PrintError(fmt.Sprintf("Failed to create runner: %v", err))
+			return	
+		}
+
+		styles.PrintProgress(fmt.Sprintf("Detected VSCode instance, proceeding to run task '%s'...", taskName))
+
+		if err := runner.RunTask(taskName); err != nil {
+			styles.PrintError(fmt.Sprintf("Error running task: %v", err))
+			return
+		}
 	},
 }
 

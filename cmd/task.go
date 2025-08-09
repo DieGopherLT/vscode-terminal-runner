@@ -26,6 +26,7 @@ func init() {
 	taskCmd.AddCommand(task.CreateCmd)
 	taskCmd.AddCommand(task.ListCmd)
 	taskCmd.AddCommand(task.DeleteCmd)
+	taskCmd.AddCommand(task.RunCmd)
 
 	// Here you will define your flags and configuration settings.
 

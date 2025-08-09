@@ -1,40 +1,18 @@
 package task
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"strings"
 	"text/tabwriter"
 
 	"github.com/DieGopherLT/vscode-terminal-runner/internal/models"
+	"github.com/DieGopherLT/vscode-terminal-runner/internal/repository"
 )
 
-func readTasks() ([]models.Task, error) {
-	file, err := os.OpenFile(TasksSaveFile, os.O_RDWR|os.O_CREATE, 0666)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	jsonContent, err := io.ReadAll(file)
-	if err != nil {
-		return nil, err
-	}
-
-	var content TaskSaveFileContent
-	if len(jsonContent) > 0 {
-		if err = json.Unmarshal(jsonContent, &content); err != nil {
-			return nil, err
-		}
-	}
-
-	return content.Tasks, nil
-}
 
 func listAllTasks() error {
-	tasks, err := readTasks()
+	tasks, err := repository.ReadTasks()
 	if err != nil {
 		return err
 	}
@@ -65,7 +43,7 @@ func listAllTasks() error {
 }
 
 func listAllTaskNames() error {
-	tasks, err := readTasks()
+	tasks, err := repository.ReadTasks()
 	if err != nil {
 		return err
 	}
@@ -84,18 +62,7 @@ func listAllTaskNames() error {
 	return nil
 }
 
-// FindTaskByName retrieves a task by its name from the saved tasks
+// FindByName retrieves a task by its name from the saved tasks
 func FindByName(name string) (*models.Task, error) {
-	tasks, err := readTasks()
-	if err != nil {
-		return nil, fmt.Errorf("failed to load tasks: %w", err)
-	}
-
-	for _, task := range tasks {
-		if task.Name == name {
-			return &task, nil
-		}
-	}
-
-	return nil, fmt.Errorf("task '%s' not found", name)
+	return repository.FindTaskByName(name)
 }
