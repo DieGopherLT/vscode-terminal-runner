@@ -1,6 +1,5 @@
 /*
-Copyright © 2025 NAME HERE <EMAIL ADDRESS>
-
+Copyright © 2025 Diego López Torres diego.lpz.trrs.dev@gmail.com
 */
 package main
 

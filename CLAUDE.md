@@ -1,0 +1,1 @@
+For all the context check the files inside @context/project.md, @context/responses.md and @context/codegen.md
