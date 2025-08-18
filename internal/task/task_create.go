@@ -12,7 +12,6 @@ import (
 	"github.com/samber/lo"
 )
 
-
 // handleTaskCreation builds a Task instance from the form values.
 func (t TaskModel) handleTaskCreation() models.Task {
 	return models.Task{
@@ -26,6 +25,9 @@ func (t TaskModel) handleTaskCreation() models.Task {
 
 // saveTask saves a task to the local configuration file.
 func (t TaskModel) saveTask(task models.Task) error {
+	if t.isEditMode {
+		return repository.UpdateTask(t.originalTaskName, task)
+	}
 	return repository.SaveTask(task)
 }
 

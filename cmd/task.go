@@ -26,5 +26,6 @@ func init() {
 	taskCmd.AddCommand(task.CreateCmd)
 	taskCmd.AddCommand(task.ListCmd)
 	taskCmd.AddCommand(task.DeleteCmd)
+	taskCmd.AddCommand(task.EditCmd)
 	taskCmd.AddCommand(task.RunCmd)
 }

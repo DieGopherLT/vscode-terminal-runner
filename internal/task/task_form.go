@@ -82,7 +82,12 @@ func (t *TaskModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if err := t.saveTask(task); err != nil {
 				return t, tea.Quit
 			}
-			t.messages.AddSuccess("Task created successfully!")
+			
+			successMessage := "Task created successfully!"
+			if t.isEditMode {
+				successMessage = "Task updated successfully!"
+			}
+			t.messages.AddSuccess(successMessage)
 			return t, tea.Quit
 		}
 	}
@@ -149,7 +154,11 @@ func (t *TaskModel) HandleInput(msg tea.Msg) tea.Cmd {
 func (t *TaskModel) View() string {
 	var sections []string
 	
-	sections = append(sections, styles.RenderTitle("CREATE TASK"))
+	title := "CREATE TASK"
+	if t.isEditMode {
+		title = "EDIT TASK"
+	}
+	sections = append(sections, styles.RenderTitle(title))
 	
 	labels := []string{
 		"Task Name:",

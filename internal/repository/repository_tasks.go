@@ -115,6 +115,53 @@ func SaveTask(task models.Task) error {
 	return os.WriteFile(TasksSaveFile, newJsonContent, 0666)
 }
 
+// UpdateTask modifies an existing task in the local configuration file.
+func UpdateTask(originalName string, updatedTask models.Task) error {
+	if err := os.MkdirAll(path.Dir(TasksSaveFile), 0755); err != nil {
+		return err
+	}
+
+	file, err := os.OpenFile(TasksSaveFile, os.O_RDWR|os.O_CREATE, 0666)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	jsonContent, err := io.ReadAll(file)
+	if err != nil {
+		return err
+	}
+
+	var content TaskSaveFileContent
+	if len(jsonContent) > 0 {
+		if err = json.Unmarshal(jsonContent, &content); err != nil {
+			return err
+		}
+	}
+
+	// Find and replace the task
+	taskIndex := -1
+	for i, task := range content.Tasks {
+		if task.Name == originalName {
+			taskIndex = i
+			break
+		}
+	}
+
+	if taskIndex == -1 {
+		return fmt.Errorf("task '%s' not found", originalName)
+	}
+
+	content.Tasks[taskIndex] = updatedTask
+
+	newJsonContent, err := json.Marshal(content)
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(TasksSaveFile, newJsonContent, 0666)
+}
+
 // DeleteTask removes a task from the local configuration file by name.
 func DeleteTask(name string) error {
 	if err := os.MkdirAll(path.Dir(TasksSaveFile), 0755); err != nil {

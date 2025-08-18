@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/DieGopherLT/vscode-terminal-runner/internal/repository"
 	"github.com/DieGopherLT/vscode-terminal-runner/internal/vscode"
 	"github.com/DieGopherLT/vscode-terminal-runner/pkg/styles"
 	tea "github.com/charmbracelet/bubbletea"
@@ -54,6 +55,30 @@ var DeleteCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		taskName := args[0]
 		fmt.Println("Deleting task:", taskName)
+	},
+}
+
+// EditCmd starts the TUI form to edit an existing task.
+var EditCmd = &cobra.Command{
+	Use:   "edit <name>",
+	Short: "Edit an existing task",
+	Long:  `Edit an existing task with the specified name`,
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		taskName := args[0]
+		
+		// Find the existing task
+		task, err := repository.FindTaskByName(taskName)
+		if err != nil {
+			styles.PrintError(fmt.Sprintf("Task '%s' not found: %v", taskName, err))
+			return
+		}
+		
+		// Start the edit form with the existing task
+		p := tea.NewProgram(NewEditModel(task))
+		if _, err := p.Run(); err != nil {
+			os.Exit(1)
+		}
 	},
 }
 
