@@ -36,7 +36,10 @@ func (t *TaskModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			
 			// If there are suggestions and Tab pressed, apply suggestion
 			if key == string(tui.KeyTab) {
-				if manager := t.getCurrentSuggestionManager(); manager != nil && manager.ShouldShow(t.inputs[t.nav.FocusIndex].Value()) {
+				if t.nav.FocusIndex == pathField && t.pathSuggestions.ShouldShow(t.inputs[t.nav.FocusIndex].Value()) {
+					t.pathSuggestions.ApplySelected(&t.inputs[t.nav.FocusIndex])
+					return t, nil
+				} else if manager := t.getCurrentSuggestionManager(); manager != nil && manager.ShouldShow(t.inputs[t.nav.FocusIndex].Value()) {
 					manager.ApplySelected(&t.inputs[t.nav.FocusIndex])
 					return t, nil
 				}
@@ -51,21 +54,28 @@ func (t *TaskModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "ctrl+n":
 			// Navigate down through suggestions (circular)
-			if manager := t.getCurrentSuggestionManager(); manager != nil {
+			if t.nav.FocusIndex == pathField {
+				t.pathSuggestions.Next()
+			} else if manager := t.getCurrentSuggestionManager(); manager != nil {
 				manager.Next()
 			}
 			return t, nil
 
 		case "ctrl+b":
 			// Navigate up through suggestions (circular)
-			if manager := t.getCurrentSuggestionManager(); manager != nil {
+			if t.nav.FocusIndex == pathField {
+				t.pathSuggestions.Previous()
+			} else if manager := t.getCurrentSuggestionManager(); manager != nil {
 				manager.Previous()
 			}
 			return t, nil
 
 		case "enter":
 			// If there are suggestions, apply the selected one
-			if manager := t.getCurrentSuggestionManager(); manager != nil && manager.ShouldShow(t.inputs[t.nav.FocusIndex].Value()) {
+			if t.nav.FocusIndex == pathField && t.pathSuggestions.ShouldShow(t.inputs[t.nav.FocusIndex].Value()) {
+				t.pathSuggestions.ApplySelected(&t.inputs[t.nav.FocusIndex])
+				return t, nil
+			} else if manager := t.getCurrentSuggestionManager(); manager != nil && manager.ShouldShow(t.inputs[t.nav.FocusIndex].Value()) {
 				manager.ApplySelected(&t.inputs[t.nav.FocusIndex])
 				return t, nil
 			}
@@ -133,9 +143,8 @@ func (t *TaskModel) HandleInput(msg tea.Msg) tea.Cmd {
 
 		// Update suggestion managers based on input changes
 		if i == pathField && i == t.nav.FocusIndex {
-			// For path suggestions, we need to dynamically update the suggestions list
-			// based on the current input to provide filesystem-based autocomplete
-			t.updatePathSuggestions(t.inputs[i].Value())
+			// For path suggestions, we use PathManager which provides filesystem-based autocomplete
+			t.pathSuggestions.UpdateFilter(t.inputs[i].Value())
 		}
 
 		if i == iconField && i == t.nav.FocusIndex {
@@ -177,15 +186,19 @@ func (t *TaskModel) View() string {
 		
 		// Show suggestions for the current focused field
 		if t.nav.FocusIndex == i {
-			if manager := t.getCurrentSuggestionManager(); manager != nil && manager.ShouldShow(t.inputs[i].Value()) {
-				suggestionBox := manager.Render()
-				if suggestionBox != "" {
-					fieldContent = lipgloss.JoinVertical(
-						lipgloss.Left,
-						fieldContent,
-						suggestionBox,
-					)
-				}
+			var suggestionBox string
+			if i == pathField && t.pathSuggestions.ShouldShow(t.inputs[i].Value()) {
+				suggestionBox = t.pathSuggestions.Render()
+			} else if manager := t.getCurrentSuggestionManager(); manager != nil && manager.ShouldShow(t.inputs[i].Value()) {
+				suggestionBox = manager.Render()
+			}
+			
+			if suggestionBox != "" {
+				fieldContent = lipgloss.JoinVertical(
+					lipgloss.Left,
+					fieldContent,
+					suggestionBox,
+				)
 			}
 		}
 		
@@ -216,7 +229,7 @@ func (t *TaskModel) View() string {
 func (t *TaskModel) getCurrentSuggestionManager() *suggestions.Manager {
 	switch t.nav.FocusIndex {
 	case pathField:
-		return t.pathSuggestions
+		return t.pathSuggestions.Manager
 	case iconField:
 		return t.iconSuggestions
 	case iconColorField:

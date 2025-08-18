@@ -25,9 +25,8 @@ type TaskModel struct {
 	inputs             []textinput.Model
 	iconSuggestions    *suggestions.Manager
 	colorSuggestions   *suggestions.Manager
-	pathSuggestions    *suggestions.Manager
+	pathSuggestions    *suggestions.PathManager
 	messages           *messages.MessageManager
-	lastPathDirectory  string
 	isEditMode         bool
 	originalTaskName   string
 }
@@ -55,7 +54,7 @@ func newModelInternal(existingTask *models.Task) tea.Model {
 		nav:              tui.NewNavigator(numberOfFields),
 		iconSuggestions:  suggestions.NewManager(iconNames, 3, suggestions.ContainsFilter),
 		colorSuggestions: suggestions.NewManager(colorNames, 3, suggestions.ContainsFilter),
-		pathSuggestions:  suggestions.NewManagerWithOptions([]string{}, 5, suggestions.StartsWithFilter, false),
+		pathSuggestions:  suggestions.NewPathManager(5),
 		messages:         messages.NewManager(),
 		isEditMode:       existingTask != nil,
 		originalTaskName: "",
