@@ -63,7 +63,7 @@ func DiscoverBridge() (*BridgeInfo, error) {
 
 // ListAvailableBridges scans for active bridge instances
 func ListAvailableBridges() ([]BridgeInfo, error) {
-	tmpDir := filepath.Join(os.TempDir(), "vscr-bridge")
+	tmpDir := filepath.Join(os.TempDir(), "vstr-bridge")
 
 	files, err := os.ReadDir(tmpDir)
 	if err != nil {
@@ -91,11 +91,9 @@ func ListAvailableBridges() ([]BridgeInfo, error) {
 			continue
 		}
 
-		// Verify bridge is still alive
-		if isBridgeAlive(info.Port) {
+		if IsBridgeOperative(info.Port) {
 			bridges = append(bridges, info)
 		} else {
-			// Clean up dead bridge file
 			os.Remove(path)
 		}
 	}
@@ -111,7 +109,7 @@ func findBridgeByWorkspace(path string) (*BridgeInfo, error) {
 	}
 
 	bridge, found := lo.Find(bridges, func(b BridgeInfo) bool {
-		return b.WorkspacePath == path
+		return b.WorkspacePath == path || strings.Contains(b.WorkspacePath, path)
 	})
 
 	if !found {
@@ -148,8 +146,8 @@ func selectBridge(bridges []BridgeInfo) (*BridgeInfo, error) {
 	return &bridges[choice-1], nil
 }
 
-// isBridgeAlive checks if a bridge server is responding
-func isBridgeAlive(port int) bool {
+// IsBridgeOperative checks if a bridge server is responding
+func IsBridgeOperative(port int) bool {
 	client := &http.Client{Timeout: 1 * time.Second}
 	resp, err := client.Get(fmt.Sprintf("http://localhost:%d/ping", port))
 	if err != nil {

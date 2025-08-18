@@ -13,7 +13,26 @@ import (
 	"github.com/samber/lo"
 )
 
-var WorkspacesSaveFile = path.Join(os.Getenv("HOME"), ".config/vsct-runner/workspaces.json")
+var (
+	WorkspacesSaveFile string
+)
+
+func init() {
+	cfgFolder, err := os.UserConfigDir()
+	if err != nil {
+		panic("could not determine user config directory: " + err.Error())
+	}
+	WorkspacesSaveFile = path.Join(cfgFolder, "vscode-terminal-runner", "workspaces.json")
+
+	if _, err := os.Stat(WorkspacesSaveFile); os.IsNotExist(err) {
+		if err := os.MkdirAll(path.Dir(WorkspacesSaveFile), 0755); err != nil {
+			return
+		}
+		if _, err := os.Create(WorkspacesSaveFile); err != nil {
+			return
+		}
+	}
+}
 
 // WorkspaceSaveFileContent represents the structure of the workspace persistence file.
 type WorkspaceSaveFileContent struct {

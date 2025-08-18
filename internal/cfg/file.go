@@ -6,19 +6,24 @@ import (
 	"path"
 )
 
-var CFG_FOLDER = path.Join(os.Getenv("HOME"), ".config/vsct-runner")
-var CFG_FILE = path.Join(CFG_FOLDER, "config.json")
+var (
+	ConfigurationFile string
+)
 
-func CheckFile() bool {
-	_, err := os.Stat(CFG_FILE)
-	return !errors.Is(err, os.ErrNotExist)
-}
-
-func CreateFile() error {
-	file, err := os.Create(CFG_FILE)
+func init() {
+	cfgDir, err := os.UserConfigDir()
 	if err != nil {
-		return err
+		panic("could not determine user config directory: " + err.Error())
 	}
-	defer file.Close()
-	return nil
+
+	ConfigurationFile = path.Join(cfgDir, "vscode-terminal-runner", "config.json")
+
+	if _, err := os.Stat(ConfigurationFile); errors.Is(err, os.ErrNotExist) {
+		if err := os.MkdirAll(path.Dir(ConfigurationFile), 0755); err != nil {
+			panic("could not create config directory: " + err.Error())
+		}
+		if _, err := os.Create(ConfigurationFile); err != nil {
+			panic("could not create config file: " + err.Error())
+		}
+	}
 }

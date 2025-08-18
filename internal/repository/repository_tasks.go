@@ -6,13 +6,34 @@ import (
 	"io"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/DieGopherLT/vscode-terminal-runner/internal/models"
 	"github.com/samber/lo"
 )
 
-var TasksSaveFile = path.Join(os.Getenv("HOME"), ".config/vsct-runner/tasks.json")
+var (
+	// tasksSaveFile holds the absolute path to the tasks.json file in the user's config directory.
+	TasksSaveFile string
+)
+
+func init() {
+	cfgFolder, err := os.UserConfigDir()
+	if err != nil {
+		panic("could not determine user config directory: " + err.Error())
+	}
+	TasksSaveFile = filepath.Join(cfgFolder, "vscode-terminal-runner", "tasks.json")
+
+	if _, err := os.Stat(TasksSaveFile); os.IsNotExist(err) {
+		if err := os.MkdirAll(filepath.Dir(TasksSaveFile), 0755); err != nil {
+			return
+		}
+		if _, err := os.Create(TasksSaveFile); err != nil {
+			return
+		}
+	}
+}
 
 // TaskSaveFileContent represents the structure of the task persistence file.
 type TaskSaveFileContent struct {
