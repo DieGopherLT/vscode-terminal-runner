@@ -65,12 +65,18 @@ const ASCIITitleTemplate = `
  ║              	%s             ║
  ╚══════════════════════════════════════╝`
 
-// Function to render title with custom text
+// RenderTitle renders a title with ASCII box border and proper centering.
 func RenderTitle(title string) string {
-	// Pad title to center it (adjust padding as needed)
-	paddedTitle := centerText(title, 34) // 34 chars to fit in the box
+	// Calculate the inner width (total width minus border characters)
+	const totalWidth = 40
+	const borderWidth = 2 // "║" on each side
+	const innerWidth = totalWidth - borderWidth
+	
+	// Center the title within the inner width
+	paddedTitle := centerText(title, innerWidth)
+	
 	asciiTitle := "╔══════════════════════════════════════╗\n" +
-		"║              " + paddedTitle + "             ║\n" +
+		"║" + paddedTitle + "║\n" +
 		"╚══════════════════════════════════════╝"
 	return TitleStyle.Render(asciiTitle)
 }
