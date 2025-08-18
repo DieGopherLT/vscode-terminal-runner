@@ -33,10 +33,29 @@ func (n *FormNavigator) HandleNavigation(key string) {
 		n.FocusIndex++
 	}
 
+	// Original logic was correct for your application
 	if n.FocusIndex > n.elementCount {
 		n.FocusIndex = 0
 	} else if n.FocusIndex < 0 {
 		n.FocusIndex = n.elementCount
 	}
+}
 
+// GetFocusIndex returns the current focus index.
+func (n *FormNavigator) GetFocusIndex() int {
+	return n.FocusIndex
+}
+
+// SetFocusIndex sets the focus index to a specific value if within bounds.
+func (n *FormNavigator) SetFocusIndex(index int) bool {
+	if index < 0 || index >= n.elementCount {
+		return false
+	}
+	n.FocusIndex = index
+	return true
+}
+
+// GetElementCount returns the total number of navigable elements.
+func (n *FormNavigator) GetElementCount() int {
+	return n.elementCount
 }
