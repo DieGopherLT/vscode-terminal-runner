@@ -4,19 +4,23 @@ Copyright © 2025 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-	"fmt"
+	"os"
 
 	"github.com/DieGopherLT/vscode-terminal-runner/internal/task"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 )
 
 // taskCmd represents the project command
 var taskCmd = &cobra.Command{
 	Use:   "task",
-	Short: "TUI to manage projects",
-	Long: `Interactive TUI to manage all tasks operations`,
+	Short: "Interactive task manager",
+	Long: `Interactive TUI to manage all task operations including create, list, edit, delete, and run tasks`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Interactive TUI to manage all tasks operations")
+		p := tea.NewProgram(task.NewMenuModel())
+		if _, err := p.Run(); err != nil {
+			os.Exit(1)
+		}
 	},
 }
 

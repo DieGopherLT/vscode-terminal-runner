@@ -11,6 +11,7 @@ import (
 )
 
 
+// listAllTasks displays all tasks in a formatted table.
 func listAllTasks() error {
 	tasks, err := repository.ReadTasks()
 	if err != nil {
@@ -23,23 +24,27 @@ func listAllTasks() error {
 	}
 
 	var strBuilder strings.Builder
-	writer := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
-	defer writer.Flush()
+	writer := tabwriter.NewWriter(&strBuilder, 0, 0, 1, ' ', 0)
 
-	strBuilder.WriteString("Name\tPath\tCommands\tIcon\tIcon Color\n")
+	fmt.Fprintln(writer, "Name\tPath\tCommands\tIcon\tIcon Color")
 	for _, task := range tasks {
-		strBuilder.WriteString(task.Name + "\t")
-
+		formattedPath := task.Path
 		if strings.HasPrefix(task.Path, os.Getenv("HOME")) {
-			task.Path = strings.Replace(task.Path, os.Getenv("HOME"), "~", 1)
+			formattedPath = strings.Replace(task.Path, os.Getenv("HOME"), "~", 1)
 		}
-		strBuilder.WriteString(task.Path + "\t")
-		strBuilder.WriteString(strings.Join(task.Cmds, ", ") + "\t")
-		strBuilder.WriteString(task.Icon + "\t")
-		strBuilder.WriteString(task.IconColor + "\n")
+		
+		fmt.Fprintf(writer, "%s\t%s\t%s\t%s\t%s\n",
+			task.Name,
+			formattedPath,
+			strings.Join(task.Cmds, ", "),
+			task.Icon,
+			task.IconColor,
+		)
 	}
-	fmt.Fprintln(writer, strBuilder.String())
-	return err
+	
+	writer.Flush()
+	fmt.Print(strBuilder.String())
+	return nil
 }
 
 func listAllTaskNames() error {
