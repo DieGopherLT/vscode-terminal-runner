@@ -1,5 +1,10 @@
 # VSTR Runner - Technical Documentation & Development Guidelines
 
+## Project Information
+
+**Binary Name:** `vstr`
+**Root Command:** `vstr` (not `vsct-runner`)
+
 ## Project Overview
 
 For project context and general information, see [README.md](README.md).
