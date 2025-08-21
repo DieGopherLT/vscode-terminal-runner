@@ -47,7 +47,8 @@ var CreateCmd = &cobra.Command{
 	Short: "Create a new workspace",
 	Long:  `Create a new workspace with selected tasks`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// TODO: Implement workspace creation TUI
-		fmt.Println("Workspace creation not yet implemented")
+		if err := CreateWorkspaceCommand(); err != nil {
+			styles.PrintError(fmt.Sprintf("Failed to create workspace: %v", err))
+		}
 	},
 }

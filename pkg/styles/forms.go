@@ -57,6 +57,33 @@ var (
 			Foreground(VSCodeBlue).
 			Bold(true).
 			MarginBottom(1)
+
+	// Task selector specific styles
+	TaskSelectorContainerStyle = lipgloss.NewStyle().
+					Border(lipgloss.RoundedBorder()).
+					BorderForeground(GrayBlue).
+					Padding(0, 1).
+					Width(90).
+					Height(9)
+
+	SelectedTaskStyle = lipgloss.NewStyle().
+				Foreground(VSCodeBlue).
+				Bold(true)
+
+	FocusedTaskStyle = lipgloss.NewStyle().
+				Background(lipgloss.Color("#2d2d2d")).
+				Foreground(White).
+				Bold(true)
+
+	TextInputStyle = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(GrayBlue).
+			Padding(0, 1).
+			Width(86)
+	
+	// Light gray style for text
+	LightGrayStyle = lipgloss.NewStyle().
+			Foreground(LightGray)
 )
 
 // ASCII title template

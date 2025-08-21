@@ -200,3 +200,8 @@ func DeleteTask(name string) error {
 	_, err = file.Write(encoded)
 	return err
 }
+
+// GetAllTasks retrieves all saved tasks.
+func GetAllTasks() ([]models.Task, error) {
+	return ReadTasks()
+}
