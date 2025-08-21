@@ -1,4 +1,5 @@
-For project general context, refer to [project reference](../context/project.md).
-For codegen guidelines to [codegen reference](../context/codegen.md).
-For response guidelines to [response reference](../context/responses.md).
-For testing guidelines to [test reference]('../context/tests.md')
+# VSTR Runner - GitHub Copilot Instructions
+
+For project context and overview, refer to [README.md](../README.md).
+
+For comprehensive technical documentation, development guidelines, code standards, and testing practices, refer to [CLAUDE.md](../CLAUDE.md).
