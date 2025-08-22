@@ -33,11 +33,11 @@ func (n *FormNavigator) HandleNavigation(key string) {
 		n.FocusIndex++
 	}
 
-	// Fix boundary logic to prevent index out of bounds
-	if n.FocusIndex >= n.elementCount {
+	// Allow navigation to submit button (elementCount index) before cycling back
+	if n.FocusIndex > n.elementCount {
 		n.FocusIndex = 0
 	} else if n.FocusIndex < 0 {
-		n.FocusIndex = n.elementCount - 1
+		n.FocusIndex = n.elementCount
 	}
 }
 
