@@ -90,13 +90,13 @@ var RunCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		taskName := args[0]
 
-		runner, err := vscode.NewRunner()
+		runner, err := vscode.NewSecureRunner()
 		if err != nil {
-			styles.PrintError(fmt.Sprintf("Failed to create runner: %v", err))
+			styles.PrintError(fmt.Sprintf("Failed to create secure runner: %v", err))
 			return	
 		}
 
-		styles.PrintProgress(fmt.Sprintf("Detected VSCode instance, proceeding to run task '%s'...", taskName))
+		styles.PrintProgress(fmt.Sprintf("Detected secure VSCode instance, proceeding to run task '%s'...", taskName))
 
 		if err := runner.RunTask(taskName); err != nil {
 			styles.PrintError(fmt.Sprintf("Error running task: %v", err))

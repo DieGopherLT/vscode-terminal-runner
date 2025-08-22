@@ -6,10 +6,12 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/DieGopherLT/vscode-terminal-runner/internal/security"
 	"github.com/DieGopherLT/vscode-terminal-runner/pkg/styles"
 	"github.com/samber/lo"
 	"github.com/shirou/gopsutil/v3/process"
@@ -18,10 +20,12 @@ import (
 type BridgeInfo struct {
 	Port          int       `json:"port"`
 	PID           int       `json:"pid"`
-	InstanceID    int       `json:"instance_id"`
+	InstanceID    int64     `json:"instance_id"`
 	WorkspacePath string    `json:"workspace_path"`
 	WorkspaceName string    `json:"workspace_name"`
 	Timestamp     time.Time `json:"timestamp"`
+	AuthToken     string    `json:"auth_token"`
+	Secure        bool      `json:"secure"`
 }
 
 // DiscoverBridge finds the correct bridge instance for the current VSCode
@@ -59,6 +63,60 @@ func DiscoverBridge() (*BridgeInfo, error) {
 
 	// 5. Multiple bridges - let user select
 	return selectBridge(bridges)
+}
+
+// DiscoverSecureBridge finds the correct secure bridge instance for the current VSCode
+func DiscoverSecureBridge() (*BridgeInfo, error) {
+	authManager := security.NewAuthManager()
+	bridgeDir := getBridgeDirectory()
+	
+	if _, err := os.Stat(bridgeDir); os.IsNotExist(err) {
+		return nil, fmt.Errorf("bridge directory not found: %s", bridgeDir)
+	}
+	
+	// Verify directory permissions
+	if !validateDirectoryPermissions(bridgeDir) {
+		return nil, fmt.Errorf("bridge directory has insecure permissions")
+	}
+	
+	files, err := os.ReadDir(bridgeDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read bridge directory: %w", err)
+	}
+	
+	var validBridges []*BridgeInfo
+	
+	for _, file := range files {
+		if !strings.HasPrefix(file.Name(), "bridge-") || !strings.HasSuffix(file.Name(), ".json") {
+			continue
+		}
+		
+		filePath := filepath.Join(bridgeDir, file.Name())
+		
+		// Validate each bridge file
+		bridgeInfo, err := validateSecureBridgeFile(authManager, filePath)
+		if err != nil {
+			// Log but continue searching other files
+			styles.PrintError(fmt.Sprintf("Skipping invalid bridge file %s: %v", file.Name(), err))
+			continue
+		}
+		
+		validBridges = append(validBridges, bridgeInfo)
+	}
+	
+	if len(validBridges) == 0 {
+		return nil, fmt.Errorf("no valid secure bridge found")
+	}
+	
+	// Return the most recent bridge
+	latest := validBridges[0]
+	for _, bridge := range validBridges[1:] {
+		if bridge.InstanceID > latest.InstanceID {
+			latest = bridge
+		}
+	}
+	
+	return latest, nil
 }
 
 // ListAvailableBridges scans for active bridge instances
@@ -265,4 +323,91 @@ func extractWorkspacePath(cmdline string) string {
 		}
 	}
 	return ""
+}
+
+// getBridgeDirectory returns the platform-specific bridge directory
+func getBridgeDirectory() string {
+	var tmpDir string
+	
+	switch runtime.GOOS {
+	case "windows":
+		tmpDir = os.Getenv("TEMP")
+		if tmpDir == "" {
+			tmpDir = os.Getenv("TMP")
+		}
+		if tmpDir == "" {
+			tmpDir = "C:\\Windows\\Temp"
+		}
+	default:
+		tmpDir = "/tmp"
+		if envTmp := os.Getenv("TMPDIR"); envTmp != "" {
+			tmpDir = envTmp
+		}
+	}
+	
+	return filepath.Join(tmpDir, "vstr-bridge")
+}
+
+// validateDirectoryPermissions checks directory has secure permissions
+func validateDirectoryPermissions(dirPath string) bool {
+	if runtime.GOOS == "windows" {
+		// Limited validation on Windows
+		return true
+	}
+	
+	info, err := os.Stat(dirPath)
+	if err != nil {
+		return false
+	}
+	
+	mode := info.Mode().Perm()
+	// Check that only owner has permissions (max 0700)
+	return mode&0o077 == 0
+}
+
+// validateSecureBridgeFile validates a single bridge file for security compliance
+func validateSecureBridgeFile(authManager *security.AuthManager, filePath string) (*BridgeInfo, error) {
+	// 1. Validate file permissions
+	if !authManager.ValidateFilePermissions(filePath) {
+		return nil, fmt.Errorf("insecure file permissions")
+	}
+	
+	// 2. Read and parse content
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file: %w", err)
+	}
+	
+	var bridgeInfo BridgeInfo
+	if err := json.Unmarshal(data, &bridgeInfo); err != nil {
+		return nil, fmt.Errorf("invalid JSON: %w", err)
+	}
+	
+	// 3. Validate structure and required fields
+	if err := validateBridgeStructure(&bridgeInfo); err != nil {
+		return nil, err
+	}
+	
+	return &bridgeInfo, nil
+}
+
+// validateBridgeStructure validates bridge information structure and values
+func validateBridgeStructure(info *BridgeInfo) error {
+	if info.Port <= 0 || info.Port > 65535 {
+		return fmt.Errorf("invalid port number: %d", info.Port)
+	}
+	
+	if info.PID <= 0 {
+		return fmt.Errorf("invalid PID: %d", info.PID)
+	}
+	
+	if len(info.AuthToken) < 32 {
+		return fmt.Errorf("invalid auth token length")
+	}
+	
+	if !info.Secure {
+		return fmt.Errorf("bridge is not in secure mode")
+	}
+	
+	return nil
 }

@@ -5,6 +5,11 @@
 **Binary Name:** `vstr`
 **Root Command:** `vstr` (not `vsct-runner`)
 
+To compile de application run:
+```shell
+go build -o vstr
+```
+
 ## Project Overview
 
 For project context and general information, see [README.md](README.md).

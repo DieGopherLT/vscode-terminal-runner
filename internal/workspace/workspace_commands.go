@@ -17,9 +17,9 @@ var RunCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		workspaceName := args[0]
 
-		runner, err := vscode.NewRunner()
+		runner, err := vscode.NewSecureRunner()
 		if err != nil {
-			styles.PrintError(fmt.Sprintf("Failed to connect to VSCode: %v", err))
+			styles.PrintError(fmt.Sprintf("Failed to connect to secure VSCode: %v", err))
 			return
 		}
 
