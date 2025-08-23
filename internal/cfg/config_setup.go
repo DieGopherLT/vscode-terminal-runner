@@ -163,8 +163,11 @@ func isExtensionInstalled() bool {
 func installExtension() error {
 	styles.PrintProgress("Installing VSTR-Bridge extension...")
 
-	// Fix the command - it should use --install-extension not --install extension
-	cmd := exec.Command("code", "--install-extension", "DieGopherLT.vstr-bridge")
+	extensionName := os.Getenv("VSTR_EXTENSION_NAME")
+	if extensionName == "" {
+		extensionName = "DieGopherLT.vstr-bridge"
+	}
+	cmd := exec.Command("code", "--install-extension", extensionName)
 	output, err := cmd.CombinedOutput()
 
 	if err != nil {

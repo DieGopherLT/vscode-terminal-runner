@@ -25,7 +25,9 @@ Examples:
 	vstr task create              # Create a new task interactively
 	vstr task run my-backend      # Run a specific task
 	vstr workspace create         # Create a new workspace
-	vstr workspace run my-project # Launch all workspace tasks in VSCode`,
+	vstr workspace run my-project # Launch all workspace tasks in VSCode
+
+To get started, run 'vstr setup'.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Default behavior - show help when no subcommand is provided
 		cmd.Help()
@@ -42,6 +44,5 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 	rootCmd.AddCommand(cfg.SetupCMD)
 }
