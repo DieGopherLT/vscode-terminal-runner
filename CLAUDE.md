@@ -12,7 +12,7 @@ go build -o vstr
 
 ## Project Overview
 
-For project context and general information, see [README.md](README.md).
+For project context and general information, see @README.md.
 
 ## Response Guidelines
 

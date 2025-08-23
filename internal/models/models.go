@@ -14,3 +14,8 @@ type Workspace struct {
 	Name  string `json:"name"`
 	Tasks []Task `json:"tasks"`
 }
+
+// Config represents the configuration for the terminal runner.
+type Config struct {
+	IsSetupComplete bool `json:"is_setup_complete"`
+}

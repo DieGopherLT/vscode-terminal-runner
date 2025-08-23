@@ -5,26 +5,30 @@ package cmd
 
 import (
 	"os"
-	"path"
 
+	"github.com/DieGopherLT/vscode-terminal-runner/internal/cfg"
 	"github.com/spf13/cobra"
 )
 
-var CFG_FILE = path.Join(os.Getenv("HOME"), ".config/vsct-runner/config.json")
-
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "vsct-runner",
-	Short: "A VSCode Terminal Runner to manage and run commands in different terminals",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
+	Use:   "vstr",
+	Short: "VSCode Terminal Runner - Automate your development workflow",
+	Long: `VSCode Terminal Runner is a powerful CLI tool that eliminates the pain of 
+manually setting up your development environment. With configurable tasks and 
+workspaces, you can launch all your project terminals and commands through VSCode.
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
+Perfect for developers working with microservices, full-stack applications, 
+or any multi-project setup.
+
+Examples:
+	vstr task create              # Create a new task interactively
+	vstr task run my-backend      # Run a specific task
+	vstr workspace create         # Create a new workspace
+	vstr workspace run my-project # Launch all workspace tasks in VSCode`,
 	Run: func(cmd *cobra.Command, args []string) {
+		// Default behavior - show help when no subcommand is provided
+		cmd.Help()
 	},
 }
 
@@ -38,13 +42,6 @@ func Execute() {
 }
 
 func init() {
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
-
-	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.vscode-terminal-runner.yaml)")
-
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	rootCmd.AddCommand(cfg.SetupCMD)
 }

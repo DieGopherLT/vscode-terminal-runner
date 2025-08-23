@@ -1,9 +1,12 @@
 package cfg
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"path"
+
+	"github.com/DieGopherLT/vscode-terminal-runner/internal/models"
 )
 
 var (
@@ -26,4 +29,31 @@ func init() {
 			panic("could not create config file: " + err.Error())
 		}
 	}
+}
+
+func Load() (models.Config, error) {
+	file, err := os.Open(ConfigurationFile)
+	if err != nil {
+		return models.Config{}, err
+	}
+	defer file.Close()
+
+	var config models.Config
+
+	// Get file information to check if file is empty
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return models.Config{}, err
+	}
+
+	// If file is empty, return default config
+	if fileInfo.Size() == 0 {
+		return models.Config{}, nil
+	}
+
+	if err := json.NewDecoder(file).Decode(&config); err != nil {
+		return models.Config{}, err
+	}
+
+	return config, nil
 }
