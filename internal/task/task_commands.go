@@ -17,6 +17,19 @@ var CreateCmd = &cobra.Command{
 	Short: "Create a new task",
 	Long:  `Create a new task with the specified configuration`,
 	Run: func(cmd *cobra.Command, args []string) {
+
+		batchPath, _ := cmd.Flags().GetString("file")
+		if batchPath != "" {
+			err := repository.SaveFromFile(batchPath) 
+			if err != nil {
+				styles.PrintError(fmt.Sprintf("Failed to create tasks from file: %v", err))
+				os.Exit(1)
+			}
+			styles.PrintSuccess("Tasks created successfully from file!")
+
+			os.Exit(0)	
+		}
+
 		p := tea.NewProgram(NewModel())
 		if _, err := p.Run(); err != nil {
 			os.Exit(1)
@@ -107,4 +120,23 @@ var RunCmd = &cobra.Command{
 
 func init() {
 	ListCmd.Flags().BoolP("only-names", "n", false, "List only task names")
+	
+	fileHelpText := "Creates tasks from a JSON file\n\n" +
+		"Example JSON format:\n" +
+		"[\n" +
+		"  {\n" +
+		"    \"name\": \"Build Project\",\n" +
+		"    \"icon\": \"tools\",\n" +
+		"    \"iconColor\": \"terminal.ansiBlue\",\n" +
+		"    \"cmds\": [\"npm run build\", \"echo Build completed\"]\n" +
+		"  },\n" +
+		"  {\n" +
+		"    \"name\": \"Run Tests\",\n" +
+		"    \"icon\": \"beaker\",\n" +
+		"    \"iconColor\": \"terminal.ansiGreen\",\n" +
+		"    \"cmds\": [\"npm test\"]\n" +
+		"  }\n" +
+		"]"
+	
+	CreateCmd.Flags().StringP("file", "f", "", fileHelpText)
 }

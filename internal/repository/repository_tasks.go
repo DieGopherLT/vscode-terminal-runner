@@ -2,6 +2,7 @@ package repository
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -17,6 +18,8 @@ var (
 	// tasksSaveFile holds the absolute path to the tasks.json file in the user's config directory.
 	TasksSaveFile string
 )
+
+type TasksBatchModel []models.Task
 
 func init() {
 	cfgFolder, err := os.UserConfigDir()
@@ -113,6 +116,54 @@ func SaveTask(task models.Task) error {
 	}
 
 	return os.WriteFile(TasksSaveFile, newJsonContent, 0666)
+}
+
+
+// SaveFromFile saves tasks from a given JSON file specified by a flag
+func SaveFromFile(path string) error {
+	file, err := os.Open(path)
+	if err != nil {
+		return errors.New("failed to open file: " + err.Error())
+	}
+	defer file.Close()
+
+	var newTasks TasksBatchModel
+	err = json.NewDecoder(file).Decode(&newTasks)
+	if err != nil {
+		return errors.New("Incorrect file format: " + err.Error())
+	}
+
+	saveFile, err := os.Open(TasksSaveFile)
+	if err != nil {
+		return errors.New("Error when creating tasks:" + err.Error())
+	}
+
+	jsonBytes, err := io.ReadAll(saveFile)
+	if err != nil {
+		return errors.New("Error when creating tasks" + err.Error())
+	}
+
+	if len(jsonBytes) == 0 {
+		return errors.New("Provided file is empty")
+	}
+
+	var content TaskSaveFileContent
+	if err = json.Unmarshal(jsonBytes, &content); err != nil {
+		return errors.New("Error when creating tasks:" + err.Error())
+	}
+
+	content.Tasks = append(content.Tasks, newTasks...)
+	newJsonContent, err := json.Marshal(content)
+	if err != nil {
+		return errors.New("Error when saving tasks:" + err.Error())
+	}
+	
+	err = os.WriteFile(TasksSaveFile, newJsonContent, 0666)
+	if err != nil {
+		return errors.New("Error when saving tasks:" + err.Error())
+	}
+
+	return nil
 }
 
 // UpdateTask modifies an existing task in the local configuration file.
