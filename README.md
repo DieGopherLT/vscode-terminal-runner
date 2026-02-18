@@ -1,25 +1,26 @@
-# 🚀 VSCode Terminal Runner - CLI
+# VSCode Terminal Runner - CLI
 
 > **Automate your development workflow** - Launch multiple development projects with a single command
 
 [![Go Version](https://img.shields.io/badge/Go-1.24.5-00ADD8?style=flat-square&logo=go)](https://golang.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](LICENSE)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](CONTRIBUTING.md)
+[![Work in Progress](https://img.shields.io/badge/status-WIP-orange.svg?style=flat-square)]()
 
-## 🎯 What is VSCode Terminal Runner?
+## What is VSCode Terminal Runner?
 
 VSCode Terminal Runner is a powerful CLI tool that **eliminates the pain** of manually setting up your development environment. With configurable tasks and workspaces, you can launch all your project terminals and commands through VSCode.
 
 Perfect for developers working with **microservices**, **full-stack applications**, or any **multi-project setup**.
 
-## ❌ The Problem
+## The Problem
 
 **Before VSCode Terminal Runner:**
+
 ```bash
 # Every day, manually:
 cd frontend && npm run dev
 # New terminal
-cd backend && npm run server  
+cd backend && npm run server
 # New terminal
 cd database && docker-compose up
 # New terminal
@@ -28,18 +29,19 @@ cd api-gateway && go run main.go
 ```
 
 **After VSCode Terminal Runner:**
+
 ```bash
-vstr workspace run my-project  # 🎉 Everything launches automatically in VSCode
+vstr workspace run my-project  # Everything launches automatically in VSCode
 ```
 
-## ✅ What VSCode Terminal Runner Solves
+## What VSCode Terminal Runner Solves
 
-- ❌ **Manual terminal management** → ✅ **Automated workspace setup**
-- ❌ **Repetitive daily commands** → ✅ **One-command project launch**
-- ❌ **Forgetting service dependencies** → ✅ **Configured execution order**
-- ❌ **Context switching overhead** → ✅ **Instant development environment**
+- Manual terminal management -> Automated workspace setup
+- Repetitive daily commands -> One-command project launch
+- Forgetting service dependencies -> Configured execution order
+- Context switching overhead -> Instant development environment
 
-## 🎬 Quick Demo
+## Quick Demo
 
 ```bash
 # 1. Install VSTR-Bridge VSCode Extension
@@ -58,16 +60,17 @@ vstr workspace create
 vstr workspace run my-fullstack-app
 ```
 
-## 🛠️ Technology Stack
+## Technology Stack
 
 **Built with Modern Go:**
-- 🖥️  **[Cobra](https://cobra.dev/)** - Powerful CLI framework with auto-completion
-- 🎨  **[Bubbletea](https://github.com/charmbracelet/bubbletea)** - Elegant TUI components  
-- 🎭  **[Lipgloss](https://github.com/charmbracelet/lipgloss)** - Beautiful styling
-- ⚡  **[samber/lo](https://github.com/samber/lo)** - Functional programming utilities
-- 🔍  **[gopsutil](https://github.com/shirou/gopsutil)** - Cross-platform process detection
 
-## 📁 Project Structure
+- **[Cobra](https://cobra.dev/)** - Powerful CLI framework with auto-completion
+- **[Bubbletea](https://github.com/charmbracelet/bubbletea)** - Elegant TUI components
+- **[Lipgloss](https://github.com/charmbracelet/lipgloss)** - Beautiful styling
+- **[samber/lo](https://github.com/samber/lo)** - Functional programming utilities
+- **[gopsutil](https://github.com/shirou/gopsutil)** - Cross-platform process detection
+
+## Project Structure
 
 **This repository contains the CLI component. The VSCode extension is in a separate repository: [VSTR-Bridge](https://github.com/DieGopherLT/VSTR-Bridge)**
 
@@ -84,7 +87,7 @@ vscode-terminal-runner/ (CLI Component)
 └── main.go               # Application entry point
 ```
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Installation
 
@@ -104,27 +107,32 @@ chmod +x vstr && sudo mv vstr /usr/local/bin/
 This CLI requires the **VSTR-Bridge** VSCode extension to function properly. The extension handles the communication between the CLI and VSCode terminals.
 
 **Install the extension:**
+
 - Repository: [VSTR-Bridge Extension](https://github.com/DieGopherLT/VSTR-Bridge)
 - **Future enhancement:** A `vstr setup` command will be available to automatically install the extension with user consent
 
 ### Quick Setup
 
 1. **Create your first task:**
+
    ```bash
    vstr task create
    ```
 
 2. **Create a workspace:**
+
    ```bash
    vstr workspace create
    ```
 
 3. **Run a task:**
+
    ```bash
    vstr task run my-task
    ```
 
 4. **Run a workspace:**
+
    ```bash
    vstr workspace run my-workspace
    ```
@@ -132,6 +140,7 @@ This CLI requires the **VSTR-Bridge** VSCode extension to function properly. The
 ### Available Commands
 
 #### Task Management
+
 ```bash
 vstr task create           # Interactive form to create a new task
 vstr task list            # List all tasks
@@ -142,56 +151,51 @@ vstr task delete <name>   # Delete a task
 ```
 
 #### Workspace Management
+
 ```bash
 vstr workspace create     # Interactive form to create a new workspace
 vstr workspace list      # List all workspaces
 vstr workspace run <name> # Run all tasks in a workspace
 ```
 
-## 📖 Use Cases
+## Use Cases
 
-- **🔧 Full-stack Development**: Launch frontend, backend, and database simultaneously
-- **🏗️ Microservices Architecture**: Start all services in correct dependency order  
-- **🧪 Testing Environments**: Set up complex test scenarios with multiple components
-- **🚀 DevOps Workflows**: Automate local development environment setup
+- **Full-stack Development**: Launch frontend, backend, and database simultaneously
+- **Microservices Architecture**: Start all services in correct dependency order
+- **Testing Environments**: Set up complex test scenarios with multiple components
+- **DevOps Workflows**: Automate local development environment setup
 
-## 🤝 Contributing
+## Status
 
-We welcome contributions! This project follows clean code principles and modern Go practices.
+This project is currently **work in progress** and is developed as a personal tool. It is open source under the MIT License, but is not actively seeking external contributors at this time.
 
-- **Development Guidelines**: See [CLAUDE.md](CLAUDE.md)
-- **Code Standards**: Functional programming with guard clauses
-- **Testing**: Comprehensive test coverage with dependency injection
-- **Documentation**: Every function documented
-
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🌟 Show Your Support
+---
 
-Give a ⭐ if VSCode Terminal Runner helps streamline your development workflow!
+**Made by DieGopherLT**
 
 ---
 
-**Made with ❤️ by developers, for developers**
-
----
-
-## 🎯 VSCode Integration
+## VSCode Integration
 
 This tool is specifically designed to integrate with VSCode through the **VSTR-Bridge** extension. The architecture works as follows:
 
 ### How it Works
+
 - **CLI Component** (`vstr`): Manages tasks, workspaces, and user configuration
 - **VSCode Extension** ([VSTR-Bridge](https://github.com/DieGopherLT/VSTR-Bridge)): Handles terminal creation and command execution within VSCode
 - **Communication**: The CLI communicates with the extension to automatically open terminals and run commands within your VSCode workspace
 
 ### Features
+
 - Seamless integration with VSCode terminal system
 - Automatic terminal creation and management
 - Commands execute in the context of your VSCode workspace
 - No manual terminal switching required
 
 ### Future Enhancements
+
 A `vstr setup` command is planned to automatically install and configure the VSTR-Bridge extension with user consent, making the initial setup even simpler.

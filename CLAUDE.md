@@ -1,327 +1,93 @@
-# VSTR Runner - Technical Documentation & Development Guidelines
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Information
 
-**Binary Name:** `vstr`
-**Root Command:** `vstr` (not `vsct-runner`)
+**Binary name:** `vstr`
 
-To compile de application run:
 ```shell
+# Build
 go build -o vstr
+
+# Run all tests
+go test ./...
+
+# Run tests for a specific package
+go test ./pkg/tui/...
+
+# Run a single test
+go test ./pkg/tui/ -run TestNavigator_HandleNavigation
 ```
 
-## Project Overview
+## Architecture Overview
 
-For project context and general information, see @README.md.
+The CLI communicates with the **VSTR-Bridge** VSCode extension via a local HTTP server. The extension creates terminals inside VSCode; the CLI tells it what to run.
 
-## Response Guidelines
-
-### Code Generation Language
-
-All generated code and documentation comments must be written in **English**.
-
-- Variable names: English
-- Function names: English  
-- Comments: English
-- Documentation: English
-- Error messages: English
-
-### Response Language
-
-Respond to the user in the **same language** as their message:
-
-- If user writes in English → Respond in English
-- If user writes in Spanish → Respond in Spanish  
-- If user writes in another language → Respond in that language
-
-The code itself always remains in English, but explanations and conversations should match the user's language preference.
-
-## Code Generation Guidelines
-
-### Clean Code Principles
-
-#### 1. Guard Clauses over Nesting
-
-**❌ Bad - Excessive nesting:**
-```go
-func (t *TaskModel) validateTask(task models.Task) bool {
-    if strings.TrimSpace(task.Name) != "" {
-        if len(task.Cmds) > 0 {
-            if task.Icon != "" {
-                _, iconExists := lo.Find(styles.VSCodeIcons, func(i styles.VSCodeIcon) bool {
-                    return i.Name == task.Icon
-                })
-                if iconExists {
-                    return true
-                }
-            }
-        }
-    }
-    return false
-}
+```
+vstr (CLI) --> BridgeClient/SecureClient --> HTTP --> VSTR-Bridge Extension --> VSCode terminals
 ```
 
-**✅ Good - Guard clauses:**
-```go
-// validateTask checks if the task contains all required fields and returns validation result.
-func (t *TaskModel) validateTask(task models.Task) bool {
-    if strings.TrimSpace(task.Name) == "" {
-        t.messages.AddError("Name is required")
-        return false
-    }
-    
-    if len(task.Cmds) == 0 {
-        t.messages.AddError("At least one command is required")
-        return false
-    }
-    
-    if task.Icon == "" {
-        t.messages.AddError("Icon is required")
-        return false
-    }
-    
-    _, iconExists := lo.Find(styles.VSCodeIcons, func(i styles.VSCodeIcon) bool {
-        return i.Name == task.Icon
-    })
-    if !iconExists {
-        t.messages.AddError("Invalid icon")
-        return false
-    }
-    
-    return true
-}
-```
+### Command Structure
 
-#### 2. Functional Approach over Imperative
+`cmd/` registers Cobra commands and delegates to `internal/` packages:
 
-**❌ Bad - Imperative loop:**
-```go
-func getTaskNames(tasks []models.Task) []string {
-    var names []string
-    for i := 0; i < len(tasks); i++ {
-        if tasks[i].Name != "" {
-            names = append(names, tasks[i].Name)
-        }
-    }
-    return names
-}
-```
+- `vstr setup` -> `internal/cfg` (setup wizard, installs VSCode extension)
+- `vstr task <sub>` -> `internal/task` (TUI forms for CRUD + run)
+- `vstr workspace <sub>` -> `internal/workspace` (TUI forms for CRUD + run)
 
-**✅ Good - Functional transformation:**
-```go
-// getTaskNames extracts valid task names from a slice of tasks.
-func getTaskNames(tasks []models.Task) []string {
-    return lo.FilterMap(tasks, func(task models.Task, _ int) (string, bool) {
-        hasValidName := task.Name != ""
-        return task.Name, hasValidName
-    })
-}
-```
+### Package Responsibilities
 
-#### 3. Self-Descriptive Variable Names & Documentation
+| Package              | Responsibility                                                     |
+| -------------------- | ------------------------------------------------------------------ |
+| `internal/models`    | Data types: `Task`, `Workspace`, `Config`                          |
+| `internal/repository`| JSON file persistence for tasks and workspaces                     |
+| `internal/cfg`       | App config file, setup wizard, extension install                   |
+| `internal/vscode`    | Bridge discovery and `BridgeClient`                                |
+| `internal/client`    | `SecureClient` — auth-aware HTTP client for bridge                 |
+| `internal/security`  | Auth token management and file permission validation               |
+| `internal/task`      | Bubbletea TUI model for task form (create/edit/list/delete/run)    |
+| `internal/workspace` | Bubbletea TUI model for workspace form                             |
+| `pkg/tui`            | Reusable `FormNavigator` and `suggestions.Manager` for TUI forms   |
+| `pkg/messages`       | `MessageManager` — collects error/success messages shown in TUI    |
+| `pkg/styles`         | Lipgloss styles, VSCode icon list, ANSI color list                 |
+| `pkg/testutils`      | Shared test helpers                                                |
 
-**Note:** Receivers can remain as single/double letters (e.g., `t`, `sm`) as they're understood in context. Focus on descriptive names for value-storing variables.
+### Data Persistence
 
-**❌ Bad - Cryptic variable names:**
-```go
-func (sm *Manager) u(i string) {
-    if i == sm.li {
-        return
-    }
-    sm.li = i
-    if i == "" {
-        sm.fs = sm.as
-    } else {
-        sm.fs = make([]string, 0)
-        for _, s := range sm.as {
-            if sm.ff(s, i) {
-                sm.fs = append(sm.fs, s)
-            }
-        }
-    }
-    sm.si = 0
-}
-```
+Tasks and workspaces are stored as JSON in the user config directory:
 
-**✅ Good - Descriptive names with documentation:**
-```go
-// UpdateFilter filters suggestions based on input text and resets selection only if input changed.
-func (sm *Manager) UpdateFilter(inputText string) {
-    if inputText == sm.lastInput {
-        return
-    }
-    
-    sm.lastInput = inputText
-    
-    if inputText == "" {
-        sm.filteredSuggestions = sm.allSuggestions
-    } else {
-        sm.filteredSuggestions = lo.Filter(sm.allSuggestions, func(suggestion string, _ int) bool {
-            return sm.filterFunc(suggestion, inputText)
-        })
-    }
-    
-    sm.selectedIndex = 0
-}
-```
+- `$XDG_CONFIG_HOME/vscode-terminal-runner/tasks.json`
+- `$XDG_CONFIG_HOME/vscode-terminal-runner/workspaces.json`
+- `$XDG_CONFIG_HOME/vscode-terminal-runner/config.json`
 
-#### 4. Extract Complex Conditions
+### Bridge Discovery
 
-**❌ Bad - Complex inline condition:**
-```go
-func (sm *Manager) ShouldShow(input string) bool {
-    if (!sm.showOnEmpty && input == "") || len(sm.GetVisible()) == 0 || (len(sm.GetVisible()) == 1 && sm.GetVisible()[0] == input) {
-        return false
-    }
-    return true
-}
-```
+When a task or workspace is run, `vscode.DiscoverBridge()` resolves the target VSCode instance in this order:
 
-**✅ Good - Extracted conditions:**
-```go
-// ShouldShow determines if suggestions should be displayed based on current state and input.
-func (sm *Manager) ShouldShow(inputText string) bool {
-    shouldHideOnEmptyInput := !sm.showOnEmpty && inputText == ""
-    if shouldHideOnEmptyInput {
-        return false
-    }
-    
-    visibleSuggestions := sm.GetVisible()
-    
-    hasNoSuggestions := len(visibleSuggestions) == 0
-    if hasNoSuggestions {
-        return false
-    }
-    
-    hasExactMatchOnly := len(visibleSuggestions) == 1 && visibleSuggestions[0] == inputText
-    if hasExactMatchOnly {
-        return false
-    }
-    
-    return true
-}
-```
+1. `VSTR` env var (set by the extension in its own terminals)
+2. Parent process tree scan for a VSCode process
+3. Scan `/tmp/vstr-bridge/*.json` files written by the extension
+4. If multiple bridges found, prompt user to select one
 
-### Project-Specific Patterns
+The secure variant (`DiscoverSecureBridge`) also validates file permissions and requires an auth token of at least 32 bytes.
 
-#### Error Handling with Guard Clauses
-```go
-// RunTask executes a single task in a new VSCode terminal.
-func (r *Runner) RunTask(taskName string) error {
-    if taskName == "" {
-        return fmt.Errorf("task name cannot be empty")
-    }
-    
-    task, err := repository.FindTaskByName(taskName)
-    if err != nil {
-        return fmt.Errorf("task not found: %w", err)
-    }
-    
-    if err := r.launcher.LaunchTerminal(*task); err != nil {
-        return fmt.Errorf("failed to launch terminal: %w", err)
-    }
-    
-    return nil
-}
-```
+### Environment Variables
 
-#### Functional Transformations with lo
-```go
-// Convert structs to names
-iconNames := lo.Map(styles.VSCodeIcons, func(icon styles.VSCodeIcon, _ int) string { 
-    return icon.Name 
-})
+| Variable             | Purpose                                                                 |
+| -------------------- | ----------------------------------------------------------------------- |
+| `VSTR`               | Port of the active bridge (set automatically by the VSCode extension)   |
+| `VSTR_EXTENSION_NAME`| Override extension ID used during `vstr setup` installation             |
 
-// Combined filtering and mapping
-validTasks := lo.FilterMap(tasks, func(task models.Task, _ int) (models.Task, bool) {
-    isValid := task.Name != "" && len(task.Cmds) > 0
-    return task, isValid
-})
-```
+---
 
-### Documentation Requirements
+## Claude's Navigation Commitment
 
-- **All functions and methods** must include documentation comments
-- Use standard Go documentation format: `// FunctionName does...`
-- Explain what the function does, not how it does it
-- Include parameter and return value descriptions when not obvious
+This CLAUDE.md is my map for navigating this module. I commit to:
 
-## Testing Guidelines
+- **Update immediately** after any code modification in this module
+- **Verify accuracy** of all symbol references after each change
+- **Maintain truth** - outdated documentation is a critical bug
+- **Treat this as my compass** - if this map is wrong, I'm lost
 
-### Overview
-
-To deliver a robust and bug-free application, comprehensive testing is a core requirement. Our architecture emphasizes dependency injection through dedicated types, making the codebase inherently more testable and maintainable.
-
-### Testing Philosophy
-
-The application follows a **dependency injection pattern** where specialized types provide specific features. This architectural decision enables:
-
-- **Isolated unit testing** - Each component can be tested in isolation
-- **Mock-friendly design** - Dependencies can be easily mocked or stubbed
-- **Clear separation of concerns** - Business logic is decoupled from external dependencies
-- **Improved maintainability** - Changes in one component don't cascade through the system
-
-### Testing Responsibilities
-
-When working with test-related requests, you have two primary responsibilities:
-
-#### 1. Testability Assessment
-
-Evaluate whether the code under test follows testable patterns:
-
-- **Dependency injection** - Are external dependencies injected rather than hardcoded?
-- **Single responsibility** - Does each function/method have a clear, focused purpose?
-- **Pure functions** - Are functions free from side effects where possible?
-- **Interface segregation** - Are dependencies abstracted behind interfaces?
-
-If the code doesn't meet these criteria, suggest refactoring improvements to enhance testability.
-
-#### 2. Test Implementation
-
-Write comprehensive tests that cover:
-
-- **Happy path scenarios** - Normal operation flows
-- **Edge cases** - Boundary conditions and unusual inputs
-- **Error handling** - Failure scenarios and error propagation
-- **Integration points** - Interactions between components
-
-### Testing Standards
-
-#### Test Structure
-- Use **table-driven tests** for multiple scenarios
-- Follow **AAA pattern** (Arrange, Act, Assert)
-- Include **descriptive test names** that explain the scenario
-
-#### Mock Strategy
-- Mock **external dependencies** (file system, network, processes)
-- Use **real implementations** for internal logic when possible
-- Prefer **interface mocks** over concrete type mocks
-
-#### Coverage Goals
-- Aim for **high code coverage** without compromising test quality
-- Focus on **critical paths** and **business logic**
-- Ensure **error paths** are adequately tested
-
-#### Example Testing Approach
-
-```go
-// Testable function with dependency injection
-func (r *Runner) ExecuteTask(task models.Task, launcher TerminalLauncher) error {
-    // Business logic that can be easily tested
-}
-
-// Corresponding test with mocked dependency
-func TestRunner_ExecuteTask(t *testing.T) {
-    mockLauncher := &MockTerminalLauncher{}
-    runner := NewRunner()
-    
-    // Test implementation
-}
-```
-
-## Important Reminders
-
-- Do what has been asked; nothing more, nothing less
-- **NEVER** create files unless they're absolutely necessary for achieving your goal
-- **ALWAYS** prefer editing an existing file to creating a new one
-- **NEVER** proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User
+Last verified: 2026-02-18
