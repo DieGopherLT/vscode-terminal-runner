@@ -34,3 +34,6 @@ go.work.sum
 # Binaries
 vstr
 vscode-terminal-runner
+
+# Generated docs
+.claude/docs/

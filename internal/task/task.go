@@ -10,25 +10,19 @@ import (
 	"github.com/DieGopherLT/vscode-terminal-runner/pkg/tui/suggestions"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/samber/lo"
 )
 
-var (
-	noStyle = lipgloss.NewStyle()
-)
-
-
 // TaskModel manages the state and logic of the TUI form for creating/editing tasks.
 type TaskModel struct {
-	nav                *tui.FormNavigator
-	inputs             []textinput.Model
-	iconSuggestions    *suggestions.Manager
-	colorSuggestions   *suggestions.Manager
-	pathSuggestions    *suggestions.PathManager
-	messages           *messages.MessageManager
-	isEditMode         bool
-	originalTaskName   string
+	nav              *tui.FormNavigator
+	inputs           []textinput.Model
+	iconSuggestions  *suggestions.Manager
+	colorSuggestions *suggestions.Manager
+	pathSuggestions  *suggestions.PathManager
+	messages         *messages.MessageManager
+	isEditMode       bool
+	originalTaskName string
 }
 
 // NewModel initializes and returns the TUI model for the task creation form.
@@ -69,7 +63,7 @@ func newModelInternal(existingTask *models.Task) tea.Model {
 		t := textinput.New()
 		t.Cursor.Style = styles.FocusedInputStyle
 		t.Width = 70
-		t.Prompt = ""  // No prompt, we'll use external labels
+		t.Prompt = "" // No prompt, we'll use external labels
 		t.PlaceholderStyle = styles.PlaceholderStyle
 
 		switch i {

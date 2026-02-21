@@ -4,31 +4,30 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/DieGopherLT/vscode-terminal-runner/internal/workspace/components"
-	"github.com/DieGopherLT/vscode-terminal-runner/pkg/messages"
 	"github.com/DieGopherLT/vscode-terminal-runner/internal/models"
 	"github.com/DieGopherLT/vscode-terminal-runner/internal/repository"
+	"github.com/DieGopherLT/vscode-terminal-runner/internal/workspace/components"
+	"github.com/DieGopherLT/vscode-terminal-runner/pkg/messages"
 	"github.com/DieGopherLT/vscode-terminal-runner/pkg/styles"
 	"github.com/DieGopherLT/vscode-terminal-runner/pkg/tui"
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
 const (
-	nameField     = 0 // Workspace name field
-	taskListField = 1 // Task selector field
+	nameField     = 0
+	taskListField = 1
 )
-
-var noStyle = lipgloss.NewStyle()
 
 // WorkspaceModel represents the form for creating/editing workspaces.
 type WorkspaceModel struct {
 	nav                   *tui.FormNavigator
-	nameInput            textinput.Model
-	taskSelector         *components.TaskSelector
-	messages             *messages.MessageManager
-	isEditMode           bool
+	nameInput             textinput.Model
+	taskSelector          *components.TaskSelector
+	messages              *messages.MessageManager
+	isEditMode            bool
 	originalWorkspaceName string
 }
 
@@ -44,23 +43,20 @@ func NewEditWorkspaceModel(workspace *models.Workspace) tea.Model {
 
 // newWorkspaceModelInternal creates the internal workspace model with optional existing workspace data.
 func newWorkspaceModelInternal(workspace *models.Workspace) *WorkspaceModel {
-	// Initialize form navigator with 2 fields (name, tasks) + submit handled separately
 	nav := tui.NewNavigator(2)
 
-	// Setup name input
 	nameInput := textinput.New()
 	nameInput.Placeholder = "Enter workspace name..."
 	nameInput.Focus()
 	nameInput.CharLimit = 50
 	nameInput.Width = 90
 
-	// Get all available tasks with proper error handling
-	availableTasks := getAvailableTasks()
-
-	// Initialize task selector
+	availableTasks, err := getAvailableTasks()
+	if err != nil {
+		availableTasks = []models.Task{}
+	}
 	taskSelector := components.NewTaskSelector(availableTasks)
 
-	// Setup edit mode if workspace is provided
 	isEditMode := workspace != nil
 	originalWorkspaceName := ""
 
@@ -72,10 +68,10 @@ func newWorkspaceModelInternal(workspace *models.Workspace) *WorkspaceModel {
 
 	return &WorkspaceModel{
 		nav:                   nav,
-		nameInput:            nameInput,
-		taskSelector:         taskSelector,
-		messages:             messages.NewManager(),
-		isEditMode:           isEditMode,
+		nameInput:             nameInput,
+		taskSelector:          taskSelector,
+		messages:              messages.NewManager(),
+		isEditMode:            isEditMode,
 		originalWorkspaceName: originalWorkspaceName,
 	}
 }
@@ -87,99 +83,101 @@ func (w *WorkspaceModel) Init() tea.Cmd {
 
 // Update handles messages and updates the workspace form state.
 func (w *WorkspaceModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	// Update the appropriate component based on focus first
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		w.nameInput.Width = msg.Width - 10
+		return w, nil
+
+	case workspaceSaveResultMsg:
+		if msg.err != nil {
+			w.messages.AddError(fmt.Sprintf("Failed to save workspace: %v", msg.err))
+			return w, nil
+		}
+		successMessage := "Workspace created successfully!"
+		if w.isEditMode {
+			successMessage = "Workspace updated successfully!"
+		}
+		w.messages.AddSuccess(successMessage)
+		return w, tea.Quit
+	}
+
 	if w.nav.FocusIndex == nameField {
 		var cmd tea.Cmd
 		w.nameInput, cmd = w.nameInput.Update(msg)
 		w.clearMessagesOnInput()
-		
-		// Check if this is a key message for navigation
+
 		if keyMsg, ok := msg.(tea.KeyMsg); ok {
-			if w.isNavigationKey(keyMsg.String()) {
+			if w.isNavigationKey(keyMsg) {
 				return w.handleKeyPress(keyMsg)
 			}
 		}
 		return w, cmd
-	} else if w.nav.FocusIndex == taskListField {
-		// If in search mode, let the task selector handle input first
+	}
+
+	if w.nav.FocusIndex == taskListField {
 		if w.taskSelector.IsInSearchMode() {
-			// Let search input handle typing, but check for navigation keys
 			if keyMsg, ok := msg.(tea.KeyMsg); ok {
-				key := keyMsg.String()
-				// Only handle navigation keys, let everything else go to search input
-				if key == "esc" || key == "enter" {
+				if key.Matches(keyMsg, tui.DefaultKeys.Quit) || key.Matches(keyMsg, tui.DefaultKeys.Enter) {
 					return w.handleKeyPress(keyMsg)
 				}
 			}
 			cmd := w.taskSelector.Update(msg)
 			return w, cmd
-		} else {
-			// Handle task selector update and key navigation
-			if keyMsg, ok := msg.(tea.KeyMsg); ok {
-				return w.handleKeyPress(keyMsg)
-			}
-			cmd := w.taskSelector.Update(msg)
-			return w, cmd
 		}
+
+		if keyMsg, ok := msg.(tea.KeyMsg); ok {
+			return w.handleKeyPress(keyMsg)
+		}
+		cmd := w.taskSelector.Update(msg)
+		return w, cmd
 	}
 
-	// Handle key messages for other cases
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		return w.handleKeyPress(msg)
+	if keyMsg, ok := msg.(tea.KeyMsg); ok {
+		return w.handleKeyPress(keyMsg)
 	}
 
 	return w, nil
 }
 
 // isNavigationKey checks if the key is for navigation between fields.
-func (w *WorkspaceModel) isNavigationKey(key string) bool {
-	navKeys := []string{
-		string(tui.KeyUp), string(tui.KeyDown), 
-		string(tui.KeyTab), string(tui.KeyShiftTab),
-		"enter", "ctrl+c", "esc",
-	}
-	
-	for _, navKey := range navKeys {
-		if key == navKey {
-			return true
-		}
-	}
-	return false
+func (w *WorkspaceModel) isNavigationKey(msg tea.KeyMsg) bool {
+	return key.Matches(msg, tui.DefaultKeys.Up) ||
+		key.Matches(msg, tui.DefaultKeys.Down) ||
+		key.Matches(msg, tui.DefaultKeys.Tab) ||
+		key.Matches(msg, tui.DefaultKeys.ShiftTab) ||
+		key.Matches(msg, tui.DefaultKeys.Enter) ||
+		key.Matches(msg, tui.DefaultKeys.Quit)
 }
 
 // handleKeyPress processes keyboard input for navigation and actions.
 func (w *WorkspaceModel) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	key := msg.String()
-
-	switch key {
-	case "ctrl+c", "esc":
-		// Exit search mode if active, otherwise quit
+	switch {
+	case key.Matches(msg, tui.DefaultKeys.Quit):
 		if w.nav.FocusIndex == taskListField && w.taskSelector.IsInSearchMode() {
 			w.taskSelector.ToggleSearch()
 			return w, nil
 		}
 		return w, tea.Quit
 
-	case string(tui.KeyUp), string(tui.KeyDown):
-		return w.handleVerticalNavigation(key)
+	case key.Matches(msg, tui.DefaultKeys.Up), key.Matches(msg, tui.DefaultKeys.Down):
+		return w.handleVerticalNavigation(msg)
 
-	case string(tui.KeyTab), string(tui.KeyShiftTab):
-		return w.handleTabNavigation(key)
+	case key.Matches(msg, tui.DefaultKeys.Tab), key.Matches(msg, tui.DefaultKeys.ShiftTab):
+		return w.handleTabNavigation(msg)
 
-	case "enter":
+	case key.Matches(msg, tui.DefaultKeys.Enter):
 		return w.handleEnterKey()
 
-	case " ":
+	case key.Matches(msg, tui.DefaultKeys.Space):
 		return w.handleSpaceKey()
 
-	case "/":
+	case key.Matches(msg, tui.DefaultKeys.Search):
 		return w.handleSearchToggle()
 
-	case "ctrl+a":
+	case key.Matches(msg, tui.DefaultKeys.SelectAll):
 		return w.handleSelectAll()
 
-	case "ctrl+d":
+	case key.Matches(msg, tui.DefaultKeys.DeselectAll):
 		return w.handleDeselectAll()
 	}
 
@@ -187,49 +185,47 @@ func (w *WorkspaceModel) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // handleVerticalNavigation processes up/down arrow keys.
-func (w *WorkspaceModel) handleVerticalNavigation(key string) (tea.Model, tea.Cmd) {
+func (w *WorkspaceModel) handleVerticalNavigation(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if w.nav.FocusIndex == taskListField && !w.taskSelector.IsInSearchMode() {
-		// Navigate within task list
-		direction := -1 // Up
-		if key == string(tui.KeyDown) {
-			direction = 1 // Down
+		direction := -1
+		if key.Matches(msg, tui.DefaultKeys.Down) {
+			direction = 1
 		}
 		w.taskSelector.MoveFocus(direction)
 		return w, nil
 	}
 
-	// Regular form navigation between fields
-	w.nav.HandleNavigation(key)
-	return w.handleFocus()
+	w.nav.HandleNavigation(msg.String())
+	w.applyFocus()
+	return w, nil
 }
 
 // handleTabNavigation processes tab and shift+tab keys.
-func (w *WorkspaceModel) handleTabNavigation(key string) (tea.Model, tea.Cmd) {
-	w.nav.HandleNavigation(key)
-	return w.handleFocus()
+func (w *WorkspaceModel) handleTabNavigation(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	w.nav.HandleNavigation(msg.String())
+	w.applyFocus()
+	return w, nil
 }
 
 // handleEnterKey processes enter key based on current context.
 func (w *WorkspaceModel) handleEnterKey() (tea.Model, tea.Cmd) {
 	if w.nav.FocusIndex == taskListField {
 		if w.taskSelector.IsInSearchMode() {
-			// Exit search mode
 			w.taskSelector.ToggleSearch()
 			return w, nil
 		}
-		// Move to submit button (outside navigator)
 		w.nav.FocusIndex = w.nav.GetElementCount()
-		return w.handleFocus()
+		w.applyFocus()
+		return w, nil
 	}
 
 	if w.nav.FocusIndex >= w.nav.GetElementCount() {
-		// Submit the workspace
 		return w.handleSubmit()
 	}
 
-	// Move to next field
 	w.nav.HandleNavigation("down")
-	return w.handleFocus()
+	w.applyFocus()
+	return w, nil
 }
 
 // handleSpaceKey processes space key for task selection.
@@ -264,8 +260,8 @@ func (w *WorkspaceModel) handleDeselectAll() (tea.Model, tea.Cmd) {
 	return w, nil
 }
 
-// handleFocus updates the focus state of form components.
-func (w *WorkspaceModel) handleFocus() (tea.Model, tea.Cmd) {
+// applyFocus updates the visual focus state of form components.
+func (w *WorkspaceModel) applyFocus() {
 	switch w.nav.FocusIndex {
 	case nameField:
 		w.nameInput.Focus()
@@ -273,14 +269,12 @@ func (w *WorkspaceModel) handleFocus() (tea.Model, tea.Cmd) {
 		w.nameInput.TextStyle = styles.FocusedInputStyle
 	default:
 		w.nameInput.Blur()
-		w.nameInput.PromptStyle = noStyle
-		w.nameInput.TextStyle = noStyle
+		w.nameInput.PromptStyle = styles.UnfocusedInputStyle
+		w.nameInput.TextStyle = styles.UnfocusedInputStyle
 	}
-
-	return w, nil
 }
 
-// handleSubmit processes workspace creation/update.
+// handleSubmit validates and kicks off async workspace persistence.
 func (w *WorkspaceModel) handleSubmit() (tea.Model, tea.Cmd) {
 	workspace := w.createWorkspaceFromForm()
 
@@ -288,18 +282,38 @@ func (w *WorkspaceModel) handleSubmit() (tea.Model, tea.Cmd) {
 		return w, nil
 	}
 
-	if err := w.saveWorkspace(workspace); err != nil {
-		w.messages.AddError(fmt.Sprintf("Failed to save workspace: %v", err))
-		return w, nil
-	}
+	return w, submitWorkspaceCmd(w, workspace)
+}
 
-	successMessage := "Workspace created successfully!"
-	if w.isEditMode {
-		successMessage = "Workspace updated successfully!"
-	}
-	w.messages.AddSuccess(successMessage)
+// submitWorkspaceCmd performs duplicate-check and save off the UI goroutine.
+func submitWorkspaceCmd(w *WorkspaceModel, workspace models.Workspace) tea.Cmd {
+	isEditMode := w.isEditMode
+	originalName := w.originalWorkspaceName
 
-	return w, tea.Quit
+	return func() tea.Msg {
+		// Duplicate check (file I/O off UI thread)
+		isRenamingOrCreating := !isEditMode || workspace.Name != originalName
+		if isRenamingOrCreating {
+			_, err := repository.FindWorkspaceByName(workspace.Name)
+			if err == nil {
+				return workspaceSaveResultMsg{err: fmt.Errorf("workspace name already exists")}
+			}
+		}
+
+		// Save first
+		if err := repository.SaveWorkspace(workspace); err != nil {
+			return workspaceSaveResultMsg{err: err}
+		}
+
+		// Only delete old record after save succeeds
+		if isEditMode && workspace.Name != originalName {
+			if err := repository.DeleteWorkspace(originalName); err != nil {
+				return workspaceSaveResultMsg{err: fmt.Errorf("saved workspace but failed to remove old record '%s': %w", originalName, err)}
+			}
+		}
+
+		return workspaceSaveResultMsg{}
+	}
 }
 
 // createWorkspaceFromForm creates a workspace model from current form state.
@@ -317,35 +331,15 @@ func (w *WorkspaceModel) isValidWorkspace(workspace models.Workspace) bool {
 	if workspace.Name == "" {
 		w.messages.AddError("Workspace name is required")
 		w.nav.FocusIndex = nameField
-		w.handleFocus()
-		return false
-	}
-
-	// Check for duplicate workspace names
-	if !w.isValidWorkspaceName(workspace.Name) {
+		w.applyFocus()
 		return false
 	}
 
 	if len(workspace.Tasks) == 0 {
 		w.messages.AddWarning("No tasks selected. Workspace will be empty.")
-		// Allow empty workspaces but warn user
 	}
 
 	return !w.messages.HasErrors()
-}
-
-// saveWorkspace saves the workspace to the repository.
-func (w *WorkspaceModel) saveWorkspace(workspace models.Workspace) error {
-	if w.isEditMode {
-		// Delete old workspace if name changed
-		if workspace.Name != w.originalWorkspaceName {
-			if err := repository.DeleteWorkspace(w.originalWorkspaceName); err != nil {
-				return fmt.Errorf("failed to delete old workspace: %w", err)
-			}
-		}
-	}
-
-	return repository.SaveWorkspace(workspace)
 }
 
 // clearMessagesOnInput clears messages when user starts typing.
@@ -359,14 +353,12 @@ func (w *WorkspaceModel) clearMessagesOnInput() {
 func (w *WorkspaceModel) View() string {
 	var sections []string
 
-	// Title
 	title := "CREATE WORKSPACE"
 	if w.isEditMode {
 		title = "EDIT WORKSPACE"
 	}
 	sections = append(sections, styles.RenderTitle(title))
 
-	// Workspace name field
 	nameFieldContent := lipgloss.JoinVertical(
 		lipgloss.Left,
 		styles.FieldLabelStyle.Render("Workspace Name:"),
@@ -374,24 +366,19 @@ func (w *WorkspaceModel) View() string {
 	)
 	sections = append(sections, styles.FieldContainerStyle.Render(nameFieldContent))
 
-	// Task selector field
 	sections = append(sections, w.taskSelector.View())
 
-	// Messages
 	if w.messages.HasMessages() {
 		sections = append(sections, w.messages.Render())
 	}
 
-	// Submit button
 	button := styles.RenderBlurredButton("Submit")
 	if w.nav.FocusIndex >= w.nav.GetElementCount() {
 		button = styles.RenderFocusedButton("Submit")
 	}
 	sections = append(sections, button)
 
-	// Help text
-	helpText := w.renderHelpText()
-	sections = append(sections, helpText)
+	sections = append(sections, w.renderHelpText())
 
 	return styles.FormContainerStyle.Render(
 		lipgloss.JoinVertical(lipgloss.Left, sections...),
@@ -405,37 +392,17 @@ func (w *WorkspaceModel) renderHelpText() string {
 	}
 
 	if w.nav.FocusIndex == taskListField {
-		return styles.HelpTextStyle.Render("↑/↓ navigate • space toggle • /search • ctrl+a/d select/deselect all • tab/shift+tab navigate")
+		return styles.HelpTextStyle.Render("up/down navigate • space toggle • /search • ctrl+a/d select/deselect all • tab/shift+tab navigate")
 	}
 
-	return styles.HelpTextStyle.Render("↑/↓/tab/shift+tab navigate • enter submit • esc quit")
+	return styles.HelpTextStyle.Render("up/down/tab/shift+tab navigate • enter submit • esc quit")
 }
 
 // getAvailableTasks retrieves all available tasks with proper error handling.
-func getAvailableTasks() []models.Task {
+func getAvailableTasks() ([]models.Task, error) {
 	availableTasks, err := repository.GetAllTasks()
 	if err != nil {
-		// Return empty slice on error - the UI will show "No tasks available" message
-		return []models.Task{}
+		return nil, fmt.Errorf("getAvailableTasks: %w", err)
 	}
-	return availableTasks
-}
-
-// isValidWorkspaceName checks if workspace name is valid and available using guard clauses.
-func (w *WorkspaceModel) isValidWorkspaceName(workspaceName string) bool {
-	// Skip validation if editing with same name
-	isEditingWithSameName := w.isEditMode && workspaceName == w.originalWorkspaceName
-	if isEditingWithSameName {
-		return true
-	}
-	
-	_, err := repository.FindWorkspaceByName(workspaceName)
-	if err == nil {
-		w.messages.AddError("Workspace name already exists")
-		w.nav.FocusIndex = nameField
-		w.handleFocus()
-		return false
-	}
-	
-	return true
+	return availableTasks, nil
 }

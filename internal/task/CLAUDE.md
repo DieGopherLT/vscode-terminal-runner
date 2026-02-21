@@ -47,7 +47,7 @@ Bubbletea TUI for task CRUD and execution. Exposes Cobra commands and interactiv
 
 Index `5` is the Submit button (navigation wraps 0..5).
 
-**Submission flow:** Enter on Submit -> `handleTaskCreation` -> `isValidTask` (errors to `MessageManager`) -> if valid, `saveTask` (create or update by `originalTaskName`) -> `tea.Quit`.
+**Submission flow:** Enter on Submit -> `handleTaskCreation` -> `isValidTask` (in-memory checks only, errors to `MessageManager`) -> if valid, `submitTaskCmd` runs async: `validateTaskPath` (`os.Stat`) -> `saveTask` -> `taskSaveResultMsg` -> `tea.Quit`.
 
 **Suggestion lifecycle:** typing updates filter; Ctrl+N/Ctrl+B cycles; Tab/Enter applies. Navigation resets manager. `getCurrentSuggestionManager` routes by `FocusIndex`.
 
@@ -77,7 +77,13 @@ Index `5` is the Submit button (navigation wraps 0..5).
 
 ## Architecture
 
-Strict Bubbletea MUV pattern. `TaskModel` holds all state: `[]textinput.Model`, three suggestion managers, `FormNavigator`, `MessageManager`, and edit-mode flags. No goroutines; all I/O is synchronous inside `Update`. View is pure function of model state.
+Strict Bubbletea MUV pattern. `TaskModel` holds all state: `[]textinput.Model`, three suggestion managers, `FormNavigator`, `MessageManager`, and edit-mode flags. View is pure function of model state.
+
+**Async I/O:** path validation (`os.Stat`) and repository save run inside `submitTaskCmd` (a `tea.Cmd`), not blocking the UI goroutine. Result arrives as `taskSaveResultMsg`.
+
+**Key bindings:** all key matching uses `key.Matches(msg, tui.DefaultKeys.X)` from `pkg/tui/keymap.go`. No raw string comparisons.
+
+**WindowSizeMsg:** `Update` handles `tea.WindowSizeMsg` to resize all inputs dynamically.
 
 ## Modification Guide
 
@@ -126,4 +132,4 @@ This CLAUDE.md is my map for navigating this module. I commit to:
 - **Maintain truth** - outdated documentation is a critical bug
 - **Treat this as my compass** - if this map is wrong, I'm lost
 
-Last verified: 2026-02-18
+Last verified: 2026-02-20

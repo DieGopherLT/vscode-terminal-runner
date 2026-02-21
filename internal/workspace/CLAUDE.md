@@ -41,7 +41,7 @@ Bubbletea TUI for workspace CRUD and execution. A workspace is a named group of 
 | 1 | Task Selector | Multi-select; warns but allows empty selection |
 | 2 | Submit button | `FocusIndex == elementCount` (2) triggers submit on Enter |
 
-**Submission flow:** Enter on Submit -> `isValidWorkspace` -> clear messages -> validate name -> warn if no tasks -> if valid, `saveWorkspace` -> `repository.SaveWorkspace` -> `tea.Quit`.
+**Submission flow:** Enter on Submit -> `isValidWorkspace` (in-memory only) -> if valid, `submitWorkspaceCmd` runs async: delete old if renamed -> `repository.SaveWorkspace` -> `workspaceSaveResultMsg` -> `tea.Quit`.
 
 **Edit mode:** if name changed, `saveWorkspace` calls `repository.DeleteWorkspace(originalName)` first, then saves new. `originalWorkspaceName` stored at init.
 
@@ -139,4 +139,4 @@ This CLAUDE.md is my map for navigating this module. I commit to:
 - **Maintain truth** - outdated documentation is a critical bug
 - **Treat this as my compass** - if this map is wrong, I'm lost
 
-Last verified: 2026-02-18
+Last verified: 2026-02-20

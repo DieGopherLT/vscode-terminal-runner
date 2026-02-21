@@ -1,8 +1,8 @@
 package task
 
 import (
+	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 
@@ -31,27 +31,40 @@ func (t TaskModel) saveTask(task models.Task) error {
 	return repository.SaveTask(task)
 }
 
+// validateTaskPath checks whether the given path exists on the filesystem.
+// It handles tilde expansion and relative paths ending with ".".
+// Returns a non-nil error if the path does not exist.
+func validateTaskPath(taskPath string, expandFn func(string) string) error {
+	p := strings.TrimSpace(taskPath)
+	if p == "" {
+		return nil
+	}
+
+	expandedPath := expandFn(p)
+
+	if strings.HasSuffix(p, ".") {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("could not determine working directory: %w", err)
+		}
+		relativePath := filepath.Join(cwd, expandedPath)
+		if _, err := os.Stat(relativePath); os.IsNotExist(err) {
+			return fmt.Errorf("path does not exist")
+		}
+		return nil
+	}
+
+	if _, err := os.Stat(expandedPath); os.IsNotExist(err) {
+		return fmt.Errorf("path does not exist")
+	}
+	return nil
+}
+
 func (t *TaskModel) isValidTask(task models.Task) bool {
+	t.messages.Clear()
 
 	if strings.TrimSpace(task.Name) == "" {
 		t.messages.AddError("Name is required")
-	}
-
-	p := strings.TrimSpace(task.Path)
-	if p != "" {
-		// Expand ~ to home directory for validation
-		expandedPath := t.expandPathForValidation(p)
-		
-		if strings.HasSuffix(p, ".") {
-			relativePath := path.Join(os.Getenv("PWD"), expandedPath)
-			if _, err := os.Stat(relativePath); os.IsNotExist(err) {
-				t.messages.AddError("Path does not exist")
-			}
-		} else {
-			if _, err := os.Stat(expandedPath); os.IsNotExist(err) {
-				t.messages.AddError("Path does not exist")
-			}
-		}
 	}
 
 	if len(task.Cmds) == 0 || (len(task.Cmds) == 1 && strings.TrimSpace(task.Cmds[0]) == "") {

@@ -80,10 +80,16 @@ var (
 			BorderForeground(GrayBlue).
 			Padding(0, 1).
 			Width(86)
-	
+
 	// Light gray style for text
 	LightGrayStyle = lipgloss.NewStyle().
 			Foreground(LightGray)
+
+	// UnfocusedInputStyle is a blank style used to reset input prompt and text styles when unfocused.
+	UnfocusedInputStyle = lipgloss.NewStyle()
+
+	// UnfocusedTaskStyle is a blank style used as the default for unselected, unfocused task items.
+	UnfocusedTaskStyle = lipgloss.NewStyle()
 )
 
 // ASCII title template
@@ -98,10 +104,10 @@ func RenderTitle(title string) string {
 	const totalWidth = 40
 	const borderWidth = 2 // "║" on each side
 	const innerWidth = totalWidth - borderWidth
-	
+
 	// Center the title within the inner width
 	paddedTitle := centerText(title, innerWidth)
-	
+
 	asciiTitle := "╔══════════════════════════════════════╗\n" +
 		"║" + paddedTitle + "║\n" +
 		"╚══════════════════════════════════════╝"
