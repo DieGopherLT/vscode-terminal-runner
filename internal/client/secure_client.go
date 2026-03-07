@@ -50,80 +50,80 @@ func (c *SecureClient) TestConnection(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	
+
 	// Add authentication headers
 	for key, value := range c.authManager.GetAuthHeaders() {
 		req.Header.Set(key, value)
 	}
-	
+
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("connection failed: %w", err)
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode == 401 {
 		return fmt.Errorf("authentication failed - invalid token")
 	}
-	
+
 	if resp.StatusCode == 429 {
 		return fmt.Errorf("rate limit exceeded - too many requests")
 	}
-	
+
 	if resp.StatusCode != 200 {
 		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
-	
+
 	// Verify bridge responds as secure
 	var pingResp struct {
 		Status   string   `json:"status"`
 		Secure   bool     `json:"secure"`
 		Features []string `json:"security_features"`
 	}
-	
+
 	if err := json.NewDecoder(resp.Body).Decode(&pingResp); err != nil {
 		return fmt.Errorf("invalid ping response: %w", err)
 	}
-	
+
 	if !pingResp.Secure {
 		return fmt.Errorf("bridge is not running in secure mode")
 	}
-	
+
 	return nil
 }
 
 // ExecuteTask sends a task for secure execution
 func (c *SecureClient) ExecuteTask(ctx context.Context, task models.Task) error {
 	payload := c.taskToPayload(task)
-	
+
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return err
 	}
-	
+
 	req, err := http.NewRequestWithContext(
-		ctx, 
-		"POST", 
-		c.baseURL+"/task", 
+		ctx,
+		"POST",
+		c.baseURL+"/task",
 		bytes.NewBuffer(body),
 	)
 	if err != nil {
 		return err
 	}
-	
+
 	req.Header.Set("Content-Type", "application/json")
-	
+
 	// Add authentication headers
 	for key, value := range c.authManager.GetAuthHeaders() {
 		req.Header.Set(key, value)
 	}
-	
+
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
-	
+
 	return c.handleResponse(resp)
 }
 
@@ -133,36 +133,60 @@ func (c *SecureClient) ExecuteWorkspace(ctx context.Context, workspace models.Wo
 		"name":  workspace.Name,
 		"tasks": c.tasksToPayload(workspace.Tasks),
 	}
-	
+
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return err
 	}
-	
+
 	req, err := http.NewRequestWithContext(
-		ctx, 
-		"POST", 
-		c.baseURL+"/workspace", 
+		ctx,
+		"POST",
+		c.baseURL+"/workspace",
 		bytes.NewBuffer(body),
 	)
 	if err != nil {
 		return err
 	}
-	
+
 	req.Header.Set("Content-Type", "application/json")
-	
+
 	// Add authentication headers
 	for key, value := range c.authManager.GetAuthHeaders() {
 		req.Header.Set(key, value)
 	}
-	
+
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
-	
-	return c.handleResponse(resp)
+
+	if !isSuccessResponse(resp.StatusCode) {
+		apiResp, err := c.parseAPIResponse(resp.Body)
+		if err != nil {
+			return fmt.Errorf("invalid response format: %w", err)
+		}
+		return c.createErrorFromStatusCode(resp.StatusCode, apiResp)
+	}
+
+	var wsResp workspaceResponse
+	if err := json.NewDecoder(resp.Body).Decode(&wsResp); err != nil {
+		return fmt.Errorf("ExecuteWorkspace: failed to parse response: %w", err)
+	}
+
+	var failures []string
+	for _, r := range wsResp.Results {
+		if !r.Success {
+			failures = append(failures, fmt.Sprintf("%s: %s", r.Task, r.Error))
+		}
+	}
+
+	if len(failures) > 0 {
+		return fmt.Errorf("some tasks failed: %v", failures)
+	}
+
+	return nil
 }
 
 // handleResponse processes HTTP response and handles security-specific errors
@@ -170,12 +194,12 @@ func (c *SecureClient) handleResponse(resp *http.Response) error {
 	if isSuccessResponse(resp.StatusCode) {
 		return nil
 	}
-	
+
 	apiResp, err := c.parseAPIResponse(resp.Body)
 	if err != nil {
 		return fmt.Errorf("invalid response format: %w", err)
 	}
-	
+
 	return c.createErrorFromStatusCode(resp.StatusCode, apiResp)
 }
 
@@ -190,12 +214,12 @@ func (c *SecureClient) parseAPIResponse(body io.ReadCloser) (*apiResponse, error
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var apiResp apiResponse
 	if err := json.Unmarshal(bodyBytes, &apiResp); err != nil {
 		return nil, err
 	}
-	
+
 	return &apiResp, nil
 }
 
@@ -204,6 +228,19 @@ type apiResponse struct {
 	Success bool   `json:"success"`
 	Error   string `json:"error"`
 	Message string `json:"message"`
+}
+
+// workspaceTaskResult represents a single task result within a workspace response
+type workspaceTaskResult struct {
+	Task    string `json:"task"`
+	Success bool   `json:"success"`
+	Error   string `json:"error,omitempty"`
+}
+
+// workspaceResponse represents the full response body from the /workspace endpoint
+type workspaceResponse struct {
+	Success bool                  `json:"success"`
+	Results []workspaceTaskResult `json:"results"`
 }
 
 // createErrorFromStatusCode creates appropriate error messages based on status codes
