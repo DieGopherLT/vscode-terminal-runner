@@ -70,7 +70,7 @@ When a task or workspace is run, `vscode.DiscoverBridge()` resolves the target V
 3. Scan `/tmp/vstr-bridge/bridge-*.json` files written by the extension
 4. If multiple bridges found, prompt user to select one
 
-Every candidate is validated: file permissions, `Secure: true` flag, and an auth token of at least 32 bytes. Discovery always yields a validated token, which `NewRunner` reuses to authenticate without re-reading the bridge file.
+The env path trusts the window-scoped `VSTR_TOKEN` directly (the extension injected it into this terminal); the process-tree and directory-scan paths validate each candidate file (permissions, `Secure: true` flag, auth token >= 32 bytes). Discovery yields a token that `NewRunner` reuses to authenticate without re-reading the bridge file.
 
 ### Environment Variables
 

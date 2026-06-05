@@ -9,7 +9,7 @@ Handles bridge discovery and authenticated HTTP communication with the VSTR-Brid
 ## Entry Points
 
 - `vscode_bridge_discovery.go::DiscoverBridge` - Layered discovery, every candidate validated for security: VSTR env var -> parent process tree -> directory scan -> user prompt
-- `vscode_bridge_discovery.go::discoverFromEnv` - Resolves the bridge from `VSTR`/`VSTR_TOKEN`; prefers the validated bridge file, falls back to the window-scoped `VSTR_TOKEN`
+- `vscode_bridge_discovery.go::discoverFromEnv` - Resolves the bridge from `VSTR`/`VSTR_TOKEN`; uses the window-scoped `VSTR_TOKEN` as the primary credential (reads the bridge file best-effort for display metadata), falling back to file validation when no token is in the env
 - `vscode_bridge_discovery.go::discoverFromParentProcess` - Walks the process tree to the parent VSCode window, matches a validated bridge by workspace path
 - `vscode_bridge_discovery.go::discoverFromScan` - Validates every bridge file; single -> use, multiple -> `selectBridge` prompt
 - `vscode_bridge_discovery.go::scanValidBridges` - Returns every bridge file passing `validateBridgeFile`; stale files are left for the extension to clean up (no consumer-side deletion)
@@ -36,7 +36,7 @@ Handles bridge discovery and authenticated HTTP communication with the VSTR-Brid
 
 **Bridge discovery order** (every candidate routed through `validateBridgeFile`, so the result always carries a validated token):
 
-1. `VSTR` env var — the per-window signal the extension injects into its terminals. The validated `bridge-<port>.json` is the source of truth; the window-scoped `VSTR_TOKEN` is a resilient fallback when that file is missing/unreadable.
+1. `VSTR` env var — the per-window signal the extension injects into its terminals. The window-scoped `VSTR_TOKEN` is the primary credential and authenticates without touching `/tmp` (the bridge file is read best-effort only for display metadata); the validated `bridge-<port>.json` is the fallback when no token is present in the env. Note: the env path is a distinct trust source (the extension injected the token into this window), so it does not route through `validateBridgeFile`; the process-tree and scan paths do.
 2. Parent process tree scan — walks up 10 levels looking for `code`/`code-insiders`/`electron`, then matches a validated bridge by workspace path
 3. Directory scan of `/tmp/vstr-bridge/bridge-*.json` — validates each; if 0 found: error; if 1: return; if 2+: `selectBridge` prompts via stdin
 
@@ -61,7 +61,7 @@ Handles bridge discovery and authenticated HTTP communication with the VSTR-Brid
 
 - `internal/models`: `Task`, `Workspace` structs
 - `internal/repository`: `FindTaskByName`, `FindWorkspaceByName`
-- `internal/security`: `AuthManager` — file permission validation, `LoadTokenFromBridge`/`LoadTokenFromString`, auth header generation
+- `internal/security`: `AuthManager` — token holding (`LoadTokenFromString`) and auth header generation; `ValidateFilePermissions` (package-level func) and `MinTokenLength` const
 - `internal/client`: `Client` — authenticated HTTP; `taskToPayload` lives here
 - `pkg/styles`: `PrintInfo`, `PrintError`, `PrintSuccess`, `RunnerTaskNameStyle`
 
