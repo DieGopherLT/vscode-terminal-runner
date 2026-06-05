@@ -23,7 +23,12 @@ func init() {
 		panic("could not determine user config directory: " + err.Error())
 	}
 	WorkspacesSaveFile = path.Join(cfgFolder, "vscode-terminal-runner", "workspaces.json")
+}
 
+// ensureWorkspacesSaveFile creates the directory and the workspaces file if they
+// do not exist yet. It is called lazily by every public function so that
+// importing this package no longer touches the filesystem at init time.
+func ensureWorkspacesSaveFile() {
 	if _, err := os.Stat(WorkspacesSaveFile); os.IsNotExist(err) {
 		if err := os.MkdirAll(path.Dir(WorkspacesSaveFile), 0755); err != nil {
 			return
@@ -41,6 +46,7 @@ type WorkspaceSaveFileContent struct {
 
 // ReadWorkspaces loads all workspaces from the persistence file.
 func ReadWorkspaces() ([]models.Workspace, error) {
+	ensureWorkspacesSaveFile()
 	file, err := os.OpenFile(WorkspacesSaveFile, os.O_RDWR|os.O_CREATE, 0666)
 	if err != nil {
 		return nil, err
@@ -82,6 +88,7 @@ func FindWorkspaceByName(name string) (*models.Workspace, error) {
 
 // SaveWorkspace saves a workspace to the local configuration file.
 func SaveWorkspace(workspace models.Workspace) error {
+	ensureWorkspacesSaveFile()
 	if err := os.MkdirAll(path.Dir(WorkspacesSaveFile), 0755); err != nil {
 		return err
 	}
@@ -104,13 +111,11 @@ func SaveWorkspace(workspace models.Workspace) error {
 		}
 	}
 
-	if _, found := lo.Find(content.Workspaces, func(ws models.Workspace) bool {
-		return ws.Name == workspace.Name
-	}); found {
-		return fmt.Errorf("workspace '%s' already exists", workspace.Name)
+	updated, err := appendWorkspaceIfUnique(content.Workspaces, workspace)
+	if err != nil {
+		return err
 	}
-
-	content.Workspaces = append(content.Workspaces, workspace)
+	content.Workspaces = updated
 
 	newJsonContent, err := json.Marshal(content)
 	if err != nil {
@@ -120,8 +125,20 @@ func SaveWorkspace(workspace models.Workspace) error {
 	return os.WriteFile(WorkspacesSaveFile, newJsonContent, 0666)
 }
 
+// appendWorkspaceIfUnique returns a new slice with workspace appended, or an error when
+// a workspace with the same name already exists. Pure: no I/O.
+func appendWorkspaceIfUnique(workspaces []models.Workspace, workspace models.Workspace) ([]models.Workspace, error) {
+	if _, found := lo.Find(workspaces, func(ws models.Workspace) bool {
+		return ws.Name == workspace.Name
+	}); found {
+		return nil, fmt.Errorf("workspace '%s' already exists", workspace.Name)
+	}
+	return append(workspaces, workspace), nil
+}
+
 // DeleteWorkspace removes a workspace from the local configuration file by name.
 func DeleteWorkspace(name string) error {
+	ensureWorkspacesSaveFile()
 	if err := os.MkdirAll(path.Dir(WorkspacesSaveFile), 0755); err != nil {
 		return err
 	}
@@ -144,9 +161,7 @@ func DeleteWorkspace(name string) error {
 		}
 	}
 
-	content.Workspaces = lo.Filter(content.Workspaces, func(ws models.Workspace, _ int) bool {
-		return ws.Name != name
-	})
+	content.Workspaces = filterOutWorkspaceByName(content.Workspaces, name)
 
 	encoded, err := json.Marshal(content)
 	if err != nil {
@@ -157,4 +172,12 @@ func DeleteWorkspace(name string) error {
 	file.Seek(0, 0)
 	_, err = file.Write(encoded)
 	return err
+}
+
+// filterOutWorkspaceByName returns a copy of workspaces without the entry whose Name
+// equals name. Pure: no I/O.
+func filterOutWorkspaceByName(workspaces []models.Workspace, name string) []models.Workspace {
+	return lo.Filter(workspaces, func(ws models.Workspace, _ int) bool {
+		return ws.Name != name
+	})
 }
