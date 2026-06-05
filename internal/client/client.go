@@ -38,11 +38,6 @@ func NewClient(port int) *Client {
 	}
 }
 
-// LoadAuth loads authentication credentials from bridge file
-func (c *Client) LoadAuth(bridgeFilePath string) error {
-	return c.authManager.LoadTokenFromBridge(bridgeFilePath)
-}
-
 // LoadAuthFromToken loads authentication from a token discovered out-of-band,
 // such as the VSTR_TOKEN env var, avoiding a re-read of the bridge file.
 func (c *Client) LoadAuthFromToken(token string) error {
