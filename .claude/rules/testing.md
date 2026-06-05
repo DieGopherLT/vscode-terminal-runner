@@ -51,7 +51,7 @@ White-box seams (NOT in `pkg/testutils` — they need package-private access, ke
 - Seam injection for filesystem persistence: `defer redirect*SaveFile(t)()` points writes at a temp file so repository tests stay hermetic.
 - Shared 32-byte `ValidTestToken` constant so every auth-path test uses one token that satisfies `security.MinTokenLength`.
 - Table-driven subtests as the default shape.
-- Bug-documenting tests: a known production bug is captured as a skipped test named with a `BUG:` prefix (`TestSaveFromFile_BUG_shouldSucceedOnFreshSystem`, `t.Skip`) so the expected-correct behavior is recorded without breaking the suite.
+- Bug-documenting tests: when a production bug cannot be fixed in scope, capture it as a skipped test named with a `BUG:` prefix and `t.Skip` so the expected-correct behavior is recorded without breaking the suite. Once the bug is fixed, un-skip the test, rename it to a positive assertion, and keep it as a regression guard (see `TestSaveFromFile_importsIntoFreshSystem`).
 
 ## What to Test
 - Repository persistence round-trips: save then load, empty-state, and overwrite paths.
@@ -65,5 +65,5 @@ White-box seams (NOT in `pkg/testutils` — they need package-private access, ke
 - Generated code.
 - Third-party libraries (Cobra, Bubbletea, lipgloss) — test our usage, not their internals.
 
-## Known Bug (do not "fix" by changing the test)
-`repository.SaveFromFile` always fails on a fresh install: it reads the destination `tasks.json` and returns "Provided file is empty" when that file is empty, but `ensureTasksSaveFile()` creates an empty `tasks.json` on a fresh system — so import can never succeed on a new machine. The message also names the wrong file (the destination, not the caller-supplied batch path). Captured by the skipped `TestSaveFromFile_BUG_shouldSucceedOnFreshSystem` in `internal/repository/repository_tasks_test.go`. Intended behavior: a valid batch file should import into an empty/non-existent `tasks.json`, treating zero bytes as zero existing tasks.
+## Fixed Bugs (kept as regression guards)
+- `repository.SaveFromFile` previously failed on a fresh install: it read the destination `tasks.json` and returned "Provided file is empty" whenever that file was empty, but `ensureTasksSaveFile()` creates an empty `tasks.json` on a fresh system, so import could never succeed on a new machine. Fixed to treat an empty destination as zero existing tasks. Guarded by `TestSaveFromFile_importsIntoFreshSystem` in `internal/repository/repository_tasks_test.go` — do not weaken it.

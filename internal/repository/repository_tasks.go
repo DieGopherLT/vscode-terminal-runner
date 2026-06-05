@@ -147,21 +147,23 @@ func SaveFromFile(path string) error {
 
 	saveFile, err := os.Open(TasksSaveFile)
 	if err != nil {
-		return errors.New("Error when creating tasks:" + err.Error())
+		return errors.New("failed to open existing tasks file: " + err.Error())
 	}
 
 	jsonBytes, err := io.ReadAll(saveFile)
+	saveFile.Close()
 	if err != nil {
-		return errors.New("Error when creating tasks" + err.Error())
+		return errors.New("failed to read existing tasks file: " + err.Error())
 	}
 
-	if len(jsonBytes) == 0 {
-		return errors.New("Provided file is empty")
-	}
-
+	// An empty destination means zero existing tasks, not an error: a fresh
+	// install always starts with an empty tasks.json, and the batch must still
+	// import. Only decode when there is content to decode.
 	var content TaskSaveFileContent
-	if err = json.Unmarshal(jsonBytes, &content); err != nil {
-		return errors.New("Error when creating tasks:" + err.Error())
+	if len(jsonBytes) > 0 {
+		if err = json.Unmarshal(jsonBytes, &content); err != nil {
+			return errors.New("failed to parse existing tasks file: " + err.Error())
+		}
 	}
 
 	content.Tasks = appendTaskBatch(content.Tasks, newTasks)

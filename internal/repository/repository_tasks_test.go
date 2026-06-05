@@ -64,32 +64,6 @@ func TestSaveTask_roundTrip(t *testing.T) {
 	}
 }
 
-func TestSaveFromFile_emptyTasksJsonReturnsError(t *testing.T) {
-	defer redirectTasksSaveFile(t)()
-
-	// Ensure the tasks.json exists but is empty (ReadTasks creates it empty).
-	if _, err := ReadTasks(); err != nil {
-		t.Fatalf("setup ReadTasks failed: %v", err)
-	}
-
-	// Write a valid batch file with one task.
-	batchFile := filepath.Join(t.TempDir(), "batch.json")
-	batch := []models.Task{{Name: "lint", Path: "/app", Cmds: []string{"golangci-lint run"}}}
-	batchBytes, _ := json.Marshal(batch)
-	if err := os.WriteFile(batchFile, batchBytes, 0666); err != nil {
-		t.Fatalf("failed to write batch file: %v", err)
-	}
-
-	// tasks.json is empty at this point → SaveFromFile must return the sentinel error.
-	err := SaveFromFile(batchFile)
-	if err == nil {
-		t.Fatal("SaveFromFile with an empty tasks.json should have returned an error")
-	}
-	if err.Error() != "Provided file is empty" {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
 func TestUpdateTask_returnsErrorWhenNameNotFound(t *testing.T) {
 	defer redirectTasksSaveFile(t)()
 
@@ -380,8 +354,7 @@ func TestSaveFromFile_returnsErrorForMalformedBatchFile(t *testing.T) {
 }
 
 // TestSaveFromFile_succeedsWhenDestinationIsPrePopulated confirms that SaveFromFile
-// works correctly when the destination tasks.json already has existing content.
-// This is the only path that succeeds because SaveFromFile refuses empty destinations.
+// appends the batch to a destination tasks.json that already has existing content.
 func TestSaveFromFile_succeedsWhenDestinationIsPrePopulated(t *testing.T) {
 	defer redirectTasksSaveFile(t)()
 
@@ -415,22 +388,15 @@ func TestSaveFromFile_succeedsWhenDestinationIsPrePopulated(t *testing.T) {
 	}
 }
 
-// BUG: SaveFromFile refuses to import a batch into a fresh (empty) tasks.json.
-// The function checks whether the destination file is empty and returns
-// "Provided file is empty", but on a fresh install ensureTasksSaveFile() always
-// creates an empty file, making it impossible to ever use SaveFromFile on a
-// newly set-up system.
-//
-// Intended behavior: a valid batch file should import successfully even when
-// tasks.json is empty (or equivalently, treats an empty file as zero tasks).
-//
-// Current behavior: returns error "Provided file is empty".
-func TestSaveFromFile_BUG_shouldSucceedOnFreshSystem(t *testing.T) {
-	t.Skip("BUG: SaveFromFile always fails on fresh install — empty tasks.json triggers 'Provided file is empty' even for a valid batch")
-
+// TestSaveFromFile_importsIntoFreshSystem confirms that a valid batch file
+// imports successfully when tasks.json is empty (the fresh-install state created
+// by ensureTasksSaveFile). An empty destination is treated as zero existing
+// tasks, not as an error. This is a regression guard for a previously fixed bug
+// where SaveFromFile returned "Provided file is empty" on any newly set-up system.
+func TestSaveFromFile_importsIntoFreshSystem(t *testing.T) {
 	defer redirectTasksSaveFile(t)()
 
-	// Fresh system: tasks.json does not exist yet.
+	// Fresh system: tasks.json starts empty.
 	batch := []models.Task{testutils.NewTask().WithName("from-file").Build()}
 	batchBytes, _ := json.Marshal(batch)
 	batchFile := filepath.Join(t.TempDir(), "batch.json")
@@ -440,6 +406,14 @@ func TestSaveFromFile_BUG_shouldSucceedOnFreshSystem(t *testing.T) {
 
 	if err := SaveFromFile(batchFile); err != nil {
 		t.Fatalf("SaveFromFile on a fresh system should succeed, got: %v", err)
+	}
+
+	tasks, err := ReadTasks()
+	if err != nil {
+		t.Fatalf("ReadTasks after SaveFromFile returned unexpected error: %v", err)
+	}
+	if len(tasks) != 1 {
+		t.Fatalf("expected 1 imported task on a fresh system, got %d", len(tasks))
 	}
 }
 
