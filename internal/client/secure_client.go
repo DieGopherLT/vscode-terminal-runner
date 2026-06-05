@@ -44,6 +44,12 @@ func (c *SecureClient) LoadAuth(bridgeFilePath string) error {
 	return c.authManager.LoadTokenFromBridge(bridgeFilePath)
 }
 
+// LoadAuthFromToken loads authentication from a token discovered out-of-band,
+// such as the VSTR_TOKEN env var, avoiding a re-read of the bridge file.
+func (c *SecureClient) LoadAuthFromToken(token string) error {
+	return c.authManager.LoadTokenFromString(token)
+}
+
 // TestConnection verifies connectivity and authentication with bridge
 func (c *SecureClient) TestConnection(ctx context.Context) error {
 	req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+"/ping", nil)

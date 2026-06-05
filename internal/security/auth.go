@@ -36,24 +36,35 @@ func (am *AuthManager) LoadTokenFromBridge(bridgeFilePath string) error {
 	if !am.ValidateFilePermissions(bridgeFilePath) {
 		return fmt.Errorf("bridge info file has insecure permissions")
 	}
-	
+
 	// 2. Read and validate content
 	bridgeInfo, err := am.readBridgeInfo(bridgeFilePath)
 	if err != nil {
 		return fmt.Errorf("failed to read bridge info: %w", err)
 	}
-	
+
 	// 3. Validate bridge is in secure mode
 	if !bridgeInfo.Secure {
 		return fmt.Errorf("bridge is not running in secure mode")
 	}
-	
+
 	// 4. Validate token length and format
 	if len(bridgeInfo.AuthToken) < 32 {
 		return fmt.Errorf("invalid auth token length")
 	}
-	
+
 	am.token = bridgeInfo.AuthToken
+	return nil
+}
+
+// LoadTokenFromString loads and validates an auth token provided directly,
+// such as the VSTR_TOKEN env var injected by the extension into its terminals.
+func (am *AuthManager) LoadTokenFromString(token string) error {
+	if len(token) < 32 {
+		return fmt.Errorf("invalid auth token length")
+	}
+
+	am.token = token
 	return nil
 }
 
@@ -63,7 +74,7 @@ func (am *AuthManager) ValidateFilePermissions(filePath string) bool {
 	if err != nil {
 		return false
 	}
-	
+
 	// On Unix systems, verify only owner has access
 	if runtime.GOOS != "windows" {
 		mode := info.Mode().Perm()
@@ -72,7 +83,7 @@ func (am *AuthManager) ValidateFilePermissions(filePath string) bool {
 			return false
 		}
 	}
-	
+
 	return true
 }
 
@@ -82,12 +93,12 @@ func (am *AuthManager) readBridgeInfo(filePath string) (*BridgeInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var bridgeInfo BridgeInfo
 	if err := json.Unmarshal(data, &bridgeInfo); err != nil {
 		return nil, err
 	}
-	
+
 	return &bridgeInfo, nil
 }
 
@@ -96,7 +107,7 @@ func (am *AuthManager) GetAuthHeaders() map[string]string {
 	if am.token == "" {
 		return nil
 	}
-	
+
 	return map[string]string{
 		"Authorization": fmt.Sprintf("Bearer %s", am.token),
 		"User-Agent":    "VSTR-CLI/1.0",

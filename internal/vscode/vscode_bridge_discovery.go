@@ -65,58 +65,137 @@ func DiscoverBridge() (*BridgeInfo, error) {
 	return selectBridge(bridges)
 }
 
-// DiscoverSecureBridge finds the correct secure bridge instance for the current VSCode
+// DiscoverSecureBridge finds the correct secure bridge instance, preferring the
+// most precise signal available: the per-window VSTR env var, then the parent
+// VSCode process, then a scan of the bridge directory. Every candidate is routed
+// through validateSecureBridgeFile so the result always carries a validated token.
 func DiscoverSecureBridge() (*BridgeInfo, error) {
 	authManager := security.NewAuthManager()
 	bridgeDir := getBridgeDirectory()
-	
+
 	if _, err := os.Stat(bridgeDir); os.IsNotExist(err) {
 		return nil, fmt.Errorf("bridge directory not found: %s", bridgeDir)
 	}
-	
-	// Verify directory permissions
+
 	if !validateDirectoryPermissions(bridgeDir) {
 		return nil, fmt.Errorf("bridge directory has insecure permissions")
 	}
-	
+
+	// 1. VSTR env var: the per-window signal the extension injects into its terminals.
+	if bridge, err := discoverFromEnv(authManager, bridgeDir); err == nil {
+		return bridge, nil
+	}
+
+	// 2. Parent VSCode process: match the running window by its workspace path.
+	if bridge, err := discoverFromParentProcess(authManager, bridgeDir); err == nil {
+		return bridge, nil
+	}
+
+	// 3. Scan all valid bridges; auto-select when one, prompt when several.
+	return discoverFromScan(authManager, bridgeDir)
+}
+
+// discoverFromEnv resolves the bridge from the VSTR/VSTR_TOKEN env vars injected by
+// the extension. VSTR carries the port (unambiguous across windows). The validated
+// bridge file is preferred as the source of truth; the window-scoped VSTR_TOKEN is a
+// resilient fallback when that file is missing or unreadable.
+func discoverFromEnv(authManager *security.AuthManager, bridgeDir string) (*BridgeInfo, error) {
+	portStr := os.Getenv("VSTR")
+	if portStr == "" {
+		return nil, fmt.Errorf("VSTR env var not set")
+	}
+
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid VSTR port %q: %w", portStr, err)
+	}
+
+	filePath := filepath.Join(bridgeDir, fmt.Sprintf("bridge-%d.json", port))
+	if bridge, err := validateSecureBridgeFile(authManager, filePath); err == nil {
+		return bridge, nil
+	}
+
+	token := os.Getenv("VSTR_TOKEN")
+	if len(token) < 32 {
+		return nil, fmt.Errorf("VSTR set to port %d but no valid bridge file or token available", port)
+	}
+
+	return &BridgeInfo{Port: port, AuthToken: token, Secure: true}, nil
+}
+
+// discoverFromParentProcess walks the process tree to the parent VSCode window and
+// matches a validated bridge by its workspace path.
+func discoverFromParentProcess(authManager *security.AuthManager, bridgeDir string) (*BridgeInfo, error) {
+	instance, err := detectParentVSCode()
+	if err != nil {
+		return nil, err
+	}
+
+	return findValidBridgeByWorkspace(authManager, bridgeDir, instance.WorkspacePath)
+}
+
+// discoverFromScan validates every bridge file in the directory and resolves a single
+// target: the only valid one, or a user choice when several are present.
+func discoverFromScan(authManager *security.AuthManager, bridgeDir string) (*BridgeInfo, error) {
+	bridges, err := scanValidBridges(authManager, bridgeDir)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(bridges) == 0 {
+		return nil, fmt.Errorf("no valid secure bridge found")
+	}
+
+	if len(bridges) == 1 {
+		return &bridges[0], nil
+	}
+
+	return selectBridge(bridges)
+}
+
+// scanValidBridges returns every bridge file that passes security validation. Invalid
+// files are reported and skipped; stale files are left for the extension to clean up.
+func scanValidBridges(authManager *security.AuthManager, bridgeDir string) ([]BridgeInfo, error) {
 	files, err := os.ReadDir(bridgeDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read bridge directory: %w", err)
 	}
-	
-	var validBridges []*BridgeInfo
-	
+
+	var bridges []BridgeInfo
 	for _, file := range files {
 		if !strings.HasPrefix(file.Name(), "bridge-") || !strings.HasSuffix(file.Name(), ".json") {
 			continue
 		}
-		
+
 		filePath := filepath.Join(bridgeDir, file.Name())
-		
-		// Validate each bridge file
 		bridgeInfo, err := validateSecureBridgeFile(authManager, filePath)
 		if err != nil {
-			// Log but continue searching other files
 			styles.PrintError(fmt.Sprintf("Skipping invalid bridge file %s: %v", file.Name(), err))
 			continue
 		}
-		
-		validBridges = append(validBridges, bridgeInfo)
+
+		bridges = append(bridges, *bridgeInfo)
 	}
-	
-	if len(validBridges) == 0 {
-		return nil, fmt.Errorf("no valid secure bridge found")
+
+	return bridges, nil
+}
+
+// findValidBridgeByWorkspace returns the validated bridge whose workspace path matches.
+func findValidBridgeByWorkspace(authManager *security.AuthManager, bridgeDir, path string) (*BridgeInfo, error) {
+	bridges, err := scanValidBridges(authManager, bridgeDir)
+	if err != nil {
+		return nil, err
 	}
-	
-	// Return the most recent bridge
-	latest := validBridges[0]
-	for _, bridge := range validBridges[1:] {
-		if bridge.InstanceID > latest.InstanceID {
-			latest = bridge
-		}
+
+	bridge, found := lo.Find(bridges, func(b BridgeInfo) bool {
+		return b.WorkspacePath == path || strings.Contains(b.WorkspacePath, path)
+	})
+
+	if !found {
+		return nil, fmt.Errorf("no bridge found for workspace %s", path)
 	}
-	
-	return latest, nil
+
+	return &bridge, nil
 }
 
 // ListAvailableBridges scans for active bridge instances
@@ -183,20 +262,20 @@ func selectBridge(bridges []BridgeInfo) (*BridgeInfo, error) {
 	fmt.Println()
 
 	for i, bridge := range bridges {
-		fmt.Printf("%d. %s (PID %d)\n", 
-			i+1, 
-			styles.RunnerTaskNameStyle.Render(bridge.WorkspaceName), 
+		fmt.Printf("%d. %s (PID %d)\n",
+			i+1,
+			styles.RunnerTaskNameStyle.Render(bridge.WorkspaceName),
 			bridge.PID)
 		fmt.Printf("   Path: %s\n", bridge.WorkspacePath)
 	}
 
 	fmt.Printf("\nSelect instance (1-%d): ", len(bridges))
-	
+
 	var choice int
 	if _, err := fmt.Scanln(&choice); err != nil {
 		return nil, fmt.Errorf("invalid input")
 	}
-	
+
 	if choice < 1 || choice > len(bridges) {
 		return nil, fmt.Errorf("invalid choice")
 	}
@@ -299,9 +378,9 @@ func detectParentVSCode() (*VSCodeInstance, error) {
 // isVSCodeProcess checks if a process name matches VSCode
 func isVSCodeProcess(name string) bool {
 	lowerName := strings.ToLower(name)
-	return strings.Contains(lowerName, "code") || 
-	       strings.Contains(lowerName, "code-insiders") ||
-	       strings.Contains(lowerName, "electron") // VSCode uses Electron
+	return strings.Contains(lowerName, "code") ||
+		strings.Contains(lowerName, "code-insiders") ||
+		strings.Contains(lowerName, "electron") // VSCode uses Electron
 }
 
 // extractWorkspacePath tries to extract workspace path from command line
@@ -328,7 +407,7 @@ func extractWorkspacePath(cmdline string) string {
 // getBridgeDirectory returns the platform-specific bridge directory
 func getBridgeDirectory() string {
 	var tmpDir string
-	
+
 	switch runtime.GOOS {
 	case "windows":
 		tmpDir = os.Getenv("TEMP")
@@ -344,7 +423,7 @@ func getBridgeDirectory() string {
 			tmpDir = envTmp
 		}
 	}
-	
+
 	return filepath.Join(tmpDir, "vstr-bridge")
 }
 
@@ -354,12 +433,12 @@ func validateDirectoryPermissions(dirPath string) bool {
 		// Limited validation on Windows
 		return true
 	}
-	
+
 	info, err := os.Stat(dirPath)
 	if err != nil {
 		return false
 	}
-	
+
 	mode := info.Mode().Perm()
 	// Check that only owner has permissions (max 0700)
 	return mode&0o077 == 0
@@ -371,23 +450,23 @@ func validateSecureBridgeFile(authManager *security.AuthManager, filePath string
 	if !authManager.ValidateFilePermissions(filePath) {
 		return nil, fmt.Errorf("insecure file permissions")
 	}
-	
+
 	// 2. Read and parse content
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file: %w", err)
 	}
-	
+
 	var bridgeInfo BridgeInfo
 	if err := json.Unmarshal(data, &bridgeInfo); err != nil {
 		return nil, fmt.Errorf("invalid JSON: %w", err)
 	}
-	
+
 	// 3. Validate structure and required fields
 	if err := validateBridgeStructure(&bridgeInfo); err != nil {
 		return nil, err
 	}
-	
+
 	return &bridgeInfo, nil
 }
 
@@ -396,18 +475,18 @@ func validateBridgeStructure(info *BridgeInfo) error {
 	if info.Port <= 0 || info.Port > 65535 {
 		return fmt.Errorf("invalid port number: %d", info.Port)
 	}
-	
+
 	if info.PID <= 0 {
 		return fmt.Errorf("invalid PID: %d", info.PID)
 	}
-	
+
 	if len(info.AuthToken) < 32 {
 		return fmt.Errorf("invalid auth token length")
 	}
-	
+
 	if !info.Secure {
 		return fmt.Errorf("bridge is not in secure mode")
 	}
-	
+
 	return nil
 }
