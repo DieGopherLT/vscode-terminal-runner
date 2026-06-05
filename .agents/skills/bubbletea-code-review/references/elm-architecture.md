@@ -75,7 +75,7 @@ func (m *Model) loadData() tea.Cmd {
 ### 1. Helper Functions Returning tea.Cmd
 
 ```go
-// ✅ CORRECT - this is NOT blocking
+// CORRECT - this is NOT blocking
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
     return m, m.fetchItems()
 }
@@ -93,7 +93,7 @@ func (m *Model) fetchItems() tea.Cmd {
 ### 2. Value Receivers on Update
 
 ```go
-// ✅ CORRECT - standard BubbleTea pattern
+// CORRECT - standard BubbleTea pattern
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
     m.counter++
     return m, nil
@@ -105,7 +105,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 ### 3. Nested Model Updates
 
 ```go
-// ✅ CORRECT - normal component composition
+// CORRECT - normal component composition
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
     var cmd tea.Cmd
     m.child, cmd = m.child.Update(msg)  // Updates child synchronously
@@ -118,7 +118,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 ### 4. Batch Commands
 
 ```go
-// ✅ CORRECT - commands execute concurrently
+// CORRECT - commands execute concurrently
 return m, tea.Batch(
     m.loadUser(),
     m.loadPosts(),
@@ -131,7 +131,7 @@ return m, tea.Batch(
 ### 5. Immediate Message Return
 
 ```go
-// ✅ CORRECT - synchronous state transition
+// CORRECT - synchronous state transition
 func (m *Model) navigateToMenu() tea.Cmd {
     return func() tea.Msg {
         return ShowMenuMsg{}  // No I/O, just returns a message
@@ -146,7 +146,7 @@ func (m *Model) navigateToMenu() tea.Cmd {
 ### 1. Blocking I/O Directly in Update
 
 ```go
-// ❌ BAD - blocks the UI
+// BAD - blocks the UI
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
     data, _ := os.ReadFile("config.json")  // BLOCKS!
     m.config = parse(data)
@@ -162,7 +162,7 @@ return m, loadConfigCmd()
 ### 2. Sleep in Update
 
 ```go
-// ❌ BAD - freezes UI for 2 seconds
+// BAD - freezes UI for 2 seconds
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
     time.Sleep(2 * time.Second)
     return m, nil
@@ -179,7 +179,7 @@ return m, tea.Tick(2*time.Second, func(t time.Time) tea.Msg {
 ### 3. HTTP Calls in Update
 
 ```go
-// ❌ BAD - network I/O in Update
+// BAD - network I/O in Update
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
     resp, _ := http.Get("https://api.example.com")
     // ...
@@ -191,7 +191,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 ### 4. Channel Operations That Block
 
 ```go
-// ❌ BAD - may block indefinitely
+// BAD - may block indefinitely
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
     data := <-m.dataChan  // Could block!
     return m, nil

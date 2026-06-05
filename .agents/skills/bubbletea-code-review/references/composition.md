@@ -505,13 +505,13 @@ form := huh.NewForm(
 ### Anti-Patterns
 
 ```go
-// ❌ BAD - calling Run() inside BubbleTea (blocks)
+// BAD - calling Run() inside BubbleTea (blocks)
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
     m.form.Run()  // BLOCKS THE UI!
     return m, nil
 }
 
-// ✅ GOOD - use Update loop
+// GOOD - use Update loop
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
     form, cmd := m.form.Update(msg)
     m.form = form.(*huh.Form)

@@ -45,7 +45,7 @@ func NewSecureRunner() (*SecureRunner, error) {
 		return nil, fmt.Errorf("secure connection test failed: %w", err)
 	}
 	
-	styles.PrintSuccess("✓ Successfully connected to secure bridge")
+	styles.PrintSuccess("Successfully connected to secure bridge")
 	
 	return &SecureRunner{client: secureClient}, nil
 }
@@ -71,7 +71,7 @@ func (sr *SecureRunner) RunTask(taskName string) error {
 		return handleSecureError(err)
 	}
 	
-	styles.PrintSuccess(fmt.Sprintf("✓ Secure terminal '%s' launched successfully", task.Name))
+	styles.PrintSuccess(fmt.Sprintf("Secure terminal '%s' launched successfully", task.Name))
 	return nil
 }
 
@@ -100,7 +100,7 @@ func (sr *SecureRunner) RunWorkspace(workspaceName string) error {
 		return handleSecureError(err)
 	}
 	
-	styles.PrintSuccess("✓ All secure terminals launched successfully")
+	styles.PrintSuccess("All secure terminals launched successfully")
 	return nil
 }
 

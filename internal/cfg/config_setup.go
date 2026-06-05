@@ -89,11 +89,11 @@ func getWelcomeMessage() string {
 		MarginBottom(2).
 		Width(70)
 
-	title := "🚀 VSCode Terminal Runner"
+	title := "VSCode Terminal Runner"
 	welcomeText := `Automate your development workflow
 Launch multiple projects with a single command
 
-⚡ Perfect for microservices and full-stack setups`
+Perfect for microservices and full-stack setups`
 
 	return titleStyle.Render(title) + "\n" + welcomeStyle.Render(welcomeText)
 }
@@ -113,13 +113,13 @@ func getExtensionRequirement() string {
 
 	var message strings.Builder
 	message.WriteString("\n")
-	message.WriteString(headerStyle.Render("⚠️  Extension Required"))
+	message.WriteString(headerStyle.Render("▲ Extension Required"))
 	message.WriteString("\n\n")
 	message.WriteString(accentStyle.Render("This CLI requires the VSTR-Bridge extension to work with VSCode."))
 	message.WriteString("\n\n")
-	message.WriteString("📦 " + accentStyle.Render("Install manually: ") + linkStyle.Render("https://github.com/DieGopherLT/VSTR-Bridge"))
+	message.WriteString(accentStyle.Render("Install manually: ") + linkStyle.Render("https://github.com/DieGopherLT/VSTR-Bridge"))
 	message.WriteString("\n")
-	message.WriteString("🔍 " + accentStyle.Render("Search in VSCode: ") + linkStyle.Render("vstr-bridge"))
+	message.WriteString(accentStyle.Render("Search in VSCode: ") + linkStyle.Render("vstr-bridge"))
 	message.WriteString("\n\n")
 
 	return message.String()
@@ -143,7 +143,7 @@ func completeSetup() error {
 
 	styles.PrintSuccess("Setup completed successfully!")
 	styles.PrintInfo("You can now use 'vstr' to manage your development workflow.")
-	
+
 	return nil
 }
 

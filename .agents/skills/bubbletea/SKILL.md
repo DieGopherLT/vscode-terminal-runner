@@ -79,10 +79,10 @@ See `references/components.md` for the complete catalog of reusable components:
 
 Beautiful physics-based animations available in the template:
 
-- 🔮 **Metaballs** - Lava lamp-style floating blobs
-- 🌊 **Wave Effects** - Sine wave distortions
-- 🌈 **Rainbow Cycling** - Animated color gradients
-- 🎭 **Layer Compositor** - ANSI-aware multi-layer rendering
+- **Metaballs** - Lava lamp-style floating blobs
+- **Wave Effects** - Sine wave distortions
+- **Rainbow Cycling** - Animated color gradients
+- **Layer Compositor** - ANSI-aware multi-layer rendering
 
 See `references/effects.md` for usage examples and integration patterns.
 
@@ -177,7 +177,7 @@ func (m model) handleLeftClick(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 
 See `references/troubleshooting.md` for detailed solutions to common issues:
 
-### ❌ DON'T: Set explicit Height() on bordered panels
+### DON'T: Set explicit Height() on bordered panels
 ```go
 // BAD: Can cause misalignment
 panelStyle := lipgloss.NewStyle().
@@ -185,7 +185,7 @@ panelStyle := lipgloss.NewStyle().
     Height(height)  // Don't do this!
 ```
 
-### ✅ DO: Fill content to exact height
+### DO: Fill content to exact height
 ```go
 // GOOD: Fill content lines to exact height
 for len(lines) < innerHeight {

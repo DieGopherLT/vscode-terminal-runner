@@ -18,7 +18,7 @@ var (
 				MarginBottom(1).
 				Width(70)
 
-	// Success message styles  
+	// Success message styles
 	SuccessMessageStyle = lipgloss.NewStyle().
 				Foreground(Success).
 				Bold(true).
@@ -48,24 +48,24 @@ var (
 
 	// Info message styles
 	InfoMessageStyle = lipgloss.NewStyle().
-			Foreground(VSCodeBlue).
-			Bold(true).
-			PaddingLeft(1)
+				Foreground(VSCodeBlue).
+				Bold(true).
+				PaddingLeft(1)
 
 	InfoContainerStyle = lipgloss.NewStyle().
-			Background(lipgloss.Color("#1B1F2D")).
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(VSCodeBlue).
-			Padding(0, 1).
-			MarginBottom(1).
-			Width(70)
+				Background(lipgloss.Color("#1B1F2D")).
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(VSCodeBlue).
+				Padding(0, 1).
+				MarginBottom(1).
+				Width(70)
 )
 
 // Message icons for different types
 const (
-	ErrorIcon    = "✖"
+	ErrorIcon    = "✗"
 	SuccessIcon  = "✓"
-	WarningIcon  = "⚠"
+	WarningIcon  = "▲"
 	InfoIcon     = "ⓘ"
 	ProgressIcon = "●"
 )

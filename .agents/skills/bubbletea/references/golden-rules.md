@@ -289,7 +289,7 @@ contentWeight, previewWeight := 3, 1  // 75/25
 
 ## Common Pitfalls
 
-### ❌ DON'T: Set explicit Height() on bordered styles
+### DON'T: Set explicit Height() on bordered styles
 
 ```go
 // BAD: Can cause misalignment
@@ -300,7 +300,7 @@ panelStyle := lipgloss.NewStyle().
 
 **Why it's bad:** The height includes borders, making calculations confusing and error-prone.
 
-### ✅ DO: Fill content to exact height, let borders add naturally
+### DO: Fill content to exact height, let borders add naturally
 
 ```go
 // GOOD: Fill content lines to exact height
@@ -311,7 +311,7 @@ panelStyle := lipgloss.NewStyle().Border(border)
 // No Height() - let content determine it
 ```
 
-### ❌ DON'T: Assume layout orientation in mouse handlers
+### DON'T: Assume layout orientation in mouse handlers
 
 ```go
 // BAD: Always using X coordinate
@@ -320,7 +320,7 @@ if msg.X < leftWidth {
 }
 ```
 
-### ✅ DO: Check layout mode first
+### DO: Check layout mode first
 
 ```go
 // GOOD: Different logic per orientation
@@ -385,9 +385,9 @@ Panel Layout Problem?
 
 Follow these 4 rules and you'll avoid 90% of TUI layout bugs:
 
-1. ✅ **Always account for borders** - Subtract 2 before rendering
-2. ✅ **Never auto-wrap** - Truncate explicitly
-3. ✅ **Match mouse to layout** - X for horizontal, Y for vertical
-4. ✅ **Use weights** - Proportional scaling
+1. **Always account for borders** - Subtract 2 before rendering
+2. **Never auto-wrap** - Truncate explicitly
+3. **Match mouse to layout** - X for horizontal, Y for vertical
+4. **Use weights** - Proportional scaling
 
 These patterns are battle-tested and will save you hours of debugging frustration.

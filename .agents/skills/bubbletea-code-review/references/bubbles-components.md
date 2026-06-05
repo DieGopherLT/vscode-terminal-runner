@@ -76,10 +76,10 @@ delegate.Styles.SelectedDesc = selectedDescStyle
 ### Anti-Patterns
 
 ```go
-// ❌ BAD - reaching into internals
+// BAD - reaching into internals
 selected := m.list.Items()[m.list.Index()]
 
-// ✅ GOOD - use provided methods
+// GOOD - use provided methods
 selected := m.list.SelectedItem()
 ```
 
@@ -178,13 +178,13 @@ m.viewport.SetContent(newContent)
 ### Anti-Patterns
 
 ```go
-// ❌ BAD - setting content in View
+// BAD - setting content in View
 func (m Model) View() string {
     m.viewport.SetContent(m.renderContent())  // Side effect!
     return m.viewport.View()
 }
 
-// ✅ GOOD - set content in Update
+// GOOD - set content in Update
 case contentLoadedMsg:
     m.viewport.SetContent(msg.content)
     return m, nil

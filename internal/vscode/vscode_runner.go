@@ -53,7 +53,7 @@ func (r *Runner) RunTask(taskName string) error {
 		return fmt.Errorf("failed to launch terminal: %w", err)
 	}
 	
-	styles.PrintSuccess(fmt.Sprintf("✓ Terminal '%s' launched successfully", t.Name))
+	styles.PrintSuccess(fmt.Sprintf("Terminal '%s' launched successfully", t.Name))
 	return nil
 }
 
@@ -79,7 +79,7 @@ func (r *Runner) RunWorkspace(workspaceName string) error {
 		return fmt.Errorf("failed to execute workspace: %w", err)
 	}
 	
-	styles.PrintSuccess("✓ All terminals launched successfully")
+	styles.PrintSuccess("All terminals launched successfully")
 	return nil
 }
 
