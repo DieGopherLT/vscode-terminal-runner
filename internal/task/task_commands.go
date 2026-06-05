@@ -20,14 +20,14 @@ var CreateCmd = &cobra.Command{
 
 		batchPath, _ := cmd.Flags().GetString("file")
 		if batchPath != "" {
-			err := repository.SaveFromFile(batchPath) 
+			err := repository.SaveFromFile(batchPath)
 			if err != nil {
 				styles.PrintError(fmt.Sprintf("Failed to create tasks from file: %v", err))
 				os.Exit(1)
 			}
 			styles.PrintSuccess("Tasks created successfully from file!")
 
-			os.Exit(0)	
+			os.Exit(0)
 		}
 
 		p := tea.NewProgram(NewModel())
@@ -79,14 +79,14 @@ var EditCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		taskName := args[0]
-		
+
 		// Find the existing task
 		task, err := repository.FindTaskByName(taskName)
 		if err != nil {
 			styles.PrintError(fmt.Sprintf("Task '%s' not found: %v", taskName, err))
 			return
 		}
-		
+
 		// Start the edit form with the existing task
 		p := tea.NewProgram(NewEditModel(task))
 		if _, err := p.Run(); err != nil {
@@ -103,10 +103,10 @@ var RunCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		taskName := args[0]
 
-		runner, err := vscode.NewSecureRunner()
+		runner, err := vscode.NewRunner()
 		if err != nil {
 			styles.PrintError(fmt.Sprintf("Failed to create secure runner: %v", err))
-			return	
+			return
 		}
 
 		styles.PrintProgress(fmt.Sprintf("Detected secure VSCode instance, proceeding to run task '%s'...", taskName))
@@ -120,7 +120,7 @@ var RunCmd = &cobra.Command{
 
 func init() {
 	ListCmd.Flags().BoolP("only-names", "n", false, "List only task names")
-	
+
 	fileHelpText := "Creates tasks from a JSON file\n\n" +
 		"Example JSON format:\n" +
 		"[\n" +
@@ -137,6 +137,6 @@ func init() {
 		"    \"cmds\": [\"npm test\"]\n" +
 		"  }\n" +
 		"]"
-	
+
 	CreateCmd.Flags().StringP("file", "f", "", fileHelpText)
 }

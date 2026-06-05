@@ -1,4 +1,3 @@
-// internal/client/secure_client.go
 package client
 
 import (
@@ -15,16 +14,16 @@ import (
 	"github.com/samber/lo"
 )
 
-// SecureClient handles secure communication with VSCode bridge
-type SecureClient struct {
+// Client handles communication with VSCode bridge
+type Client struct {
 	httpClient  *http.Client
 	authManager *security.AuthManager
 	baseURL     string
 }
 
-// NewSecureClient creates a new secure client for bridge communication
-func NewSecureClient(port int) *SecureClient {
-	return &SecureClient{
+// NewClient creates a new client for bridge communication
+func NewClient(port int) *Client {
+	return &Client{
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 			Transport: &http.Transport{
@@ -40,18 +39,18 @@ func NewSecureClient(port int) *SecureClient {
 }
 
 // LoadAuth loads authentication credentials from bridge file
-func (c *SecureClient) LoadAuth(bridgeFilePath string) error {
+func (c *Client) LoadAuth(bridgeFilePath string) error {
 	return c.authManager.LoadTokenFromBridge(bridgeFilePath)
 }
 
 // LoadAuthFromToken loads authentication from a token discovered out-of-band,
 // such as the VSTR_TOKEN env var, avoiding a re-read of the bridge file.
-func (c *SecureClient) LoadAuthFromToken(token string) error {
+func (c *Client) LoadAuthFromToken(token string) error {
 	return c.authManager.LoadTokenFromString(token)
 }
 
 // TestConnection verifies connectivity and authentication with bridge
-func (c *SecureClient) TestConnection(ctx context.Context) error {
+func (c *Client) TestConnection(ctx context.Context) error {
 	req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+"/ping", nil)
 	if err != nil {
 		return err
@@ -98,8 +97,8 @@ func (c *SecureClient) TestConnection(ctx context.Context) error {
 	return nil
 }
 
-// ExecuteTask sends a task for secure execution
-func (c *SecureClient) ExecuteTask(ctx context.Context, task models.Task) error {
+// ExecuteTask sends a task for execution
+func (c *Client) ExecuteTask(ctx context.Context, task models.Task) error {
 	payload := c.taskToPayload(task)
 
 	body, err := json.Marshal(payload)
@@ -133,8 +132,8 @@ func (c *SecureClient) ExecuteTask(ctx context.Context, task models.Task) error 
 	return c.handleResponse(resp)
 }
 
-// ExecuteWorkspace sends a workspace for secure execution
-func (c *SecureClient) ExecuteWorkspace(ctx context.Context, workspace models.Workspace) error {
+// ExecuteWorkspace sends a workspace for execution
+func (c *Client) ExecuteWorkspace(ctx context.Context, workspace models.Workspace) error {
 	payload := map[string]interface{}{
 		"name":  workspace.Name,
 		"tasks": c.tasksToPayload(workspace.Tasks),
@@ -196,7 +195,7 @@ func (c *SecureClient) ExecuteWorkspace(ctx context.Context, workspace models.Wo
 }
 
 // handleResponse processes HTTP response and handles security-specific errors
-func (c *SecureClient) handleResponse(resp *http.Response) error {
+func (c *Client) handleResponse(resp *http.Response) error {
 	if isSuccessResponse(resp.StatusCode) {
 		return nil
 	}
@@ -215,7 +214,7 @@ func isSuccessResponse(statusCode int) bool {
 }
 
 // parseAPIResponse parses the API response body into a structured format
-func (c *SecureClient) parseAPIResponse(body io.ReadCloser) (*apiResponse, error) {
+func (c *Client) parseAPIResponse(body io.ReadCloser) (*apiResponse, error) {
 	bodyBytes, err := io.ReadAll(body)
 	if err != nil {
 		return nil, err
@@ -250,7 +249,7 @@ type workspaceResponse struct {
 }
 
 // createErrorFromStatusCode creates appropriate error messages based on status codes
-func (c *SecureClient) createErrorFromStatusCode(statusCode int, apiResp *apiResponse) error {
+func (c *Client) createErrorFromStatusCode(statusCode int, apiResp *apiResponse) error {
 	switch statusCode {
 	case 401:
 		return fmt.Errorf("authentication failed: %s", apiResp.Error)
@@ -264,7 +263,7 @@ func (c *SecureClient) createErrorFromStatusCode(statusCode int, apiResp *apiRes
 }
 
 // taskToPayload converts a Task model to bridge API format
-func (c *SecureClient) taskToPayload(task models.Task) map[string]interface{} {
+func (c *Client) taskToPayload(task models.Task) map[string]interface{} {
 	return map[string]interface{}{
 		"name":      task.Name,
 		"path":      task.Path,
@@ -275,7 +274,7 @@ func (c *SecureClient) taskToPayload(task models.Task) map[string]interface{} {
 }
 
 // tasksToPayload converts multiple tasks to payload format using functional approach
-func (c *SecureClient) tasksToPayload(tasks []models.Task) []map[string]interface{} {
+func (c *Client) tasksToPayload(tasks []models.Task) []map[string]interface{} {
 	return lo.Map(tasks, func(task models.Task, _ int) map[string]interface{} {
 		return c.taskToPayload(task)
 	})
