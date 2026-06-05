@@ -25,7 +25,7 @@ go test ./pkg/tui/ -run TestNavigator_HandleNavigation
 The CLI communicates with the **VSTR-Bridge** VSCode extension via a local HTTP server. The extension creates terminals inside VSCode; the CLI tells it what to run.
 
 ```
-vstr (CLI) --> BridgeClient/SecureClient --> HTTP --> VSTR-Bridge Extension --> VSCode terminals
+vstr (CLI) --> Runner --> client.Client --> HTTP --> VSTR-Bridge Extension --> VSCode terminals
 ```
 
 ### Command Structure
@@ -43,8 +43,8 @@ vstr (CLI) --> BridgeClient/SecureClient --> HTTP --> VSTR-Bridge Extension --> 
 | `internal/models`    | Data types: `Task`, `Workspace`, `Config`                          |
 | `internal/repository`| JSON file persistence for tasks and workspaces                     |
 | `internal/cfg`       | App config file, setup wizard, extension install                   |
-| `internal/vscode`    | Bridge discovery and `BridgeClient`                                |
-| `internal/client`    | `SecureClient` — auth-aware HTTP client for bridge                 |
+| `internal/vscode`    | Bridge discovery and `Runner` orchestration                        |
+| `internal/client`    | `Client` — auth-aware HTTP client for bridge                       |
 | `internal/security`  | Auth token management and file permission validation               |
 | `internal/task`      | Bubbletea TUI model for task form (create/edit/list/delete/run)    |
 | `internal/workspace` | Bubbletea TUI model for workspace form                             |
@@ -65,12 +65,12 @@ Tasks and workspaces are stored as JSON in the user config directory:
 
 When a task or workspace is run, `vscode.DiscoverBridge()` resolves the target VSCode instance in this order:
 
-1. `VSTR` env var (set by the extension in its own terminals)
+1. `VSTR`/`VSTR_TOKEN` env vars (set by the extension in its own terminals; window-scoped)
 2. Parent process tree scan for a VSCode process
-3. Scan `/tmp/vstr-bridge/*.json` files written by the extension
+3. Scan `/tmp/vstr-bridge/bridge-*.json` files written by the extension
 4. If multiple bridges found, prompt user to select one
 
-The secure variant (`DiscoverSecureBridge`) also validates file permissions and requires an auth token of at least 32 bytes.
+Every candidate is validated: file permissions, `Secure: true` flag, and an auth token of at least 32 bytes. Discovery always yields a validated token, which `NewRunner` reuses to authenticate without re-reading the bridge file.
 
 ### Environment Variables
 
@@ -90,4 +90,4 @@ This CLAUDE.md is my map for navigating this module. I commit to:
 - **Maintain truth** - outdated documentation is a critical bug
 - **Treat this as my compass** - if this map is wrong, I'm lost
 
-Last verified: 2026-02-18
+Last verified: 2026-06-04

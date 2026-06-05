@@ -4,32 +4,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Handles bridge discovery and HTTP communication with the VSTR-Bridge VSCode extension. Provides two execution paths: plain (`Runner`/`BridgeClient`) and authenticated (`SecureRunner`/`SecureClient`).
+Handles bridge discovery and authenticated HTTP communication with the VSTR-Bridge VSCode extension. There is a single execution path: `Runner` (this package) orchestrates discovery and delegates I/O to `client.Client` (`internal/client`). All bridge traffic is authenticated; the bridge must run in secure mode.
 
 ## Entry Points
 
-- `vscode_bridge_discovery.go::DiscoverBridge` - Layered bridge discovery: env var -> process tree -> /tmp scan -> user prompt
-- `vscode_bridge_discovery.go::DiscoverSecureBridge` - Secure bridge discovery with file permission validation and token length check
-- `vscode_bridge_discovery.go::ListAvailableBridges` - Scans `/tmp/vstr-bridge/*.json`, pings each, returns active bridges
-- `vscode_bridge_discovery.go::IsBridgeOperative` - Single HTTP GET `/ping` with 1s timeout
-- `vscode_runner.go::NewRunner` - Creates plain Runner: discovers bridge, creates BridgeClient, pings
+- `vscode_bridge_discovery.go::DiscoverBridge` - Layered discovery, every candidate validated for security: VSTR env var -> parent process tree -> directory scan -> user prompt
+- `vscode_bridge_discovery.go::discoverFromEnv` - Resolves the bridge from `VSTR`/`VSTR_TOKEN`; prefers the validated bridge file, falls back to the window-scoped `VSTR_TOKEN`
+- `vscode_bridge_discovery.go::discoverFromParentProcess` - Walks the process tree to the parent VSCode window, matches a validated bridge by workspace path
+- `vscode_bridge_discovery.go::discoverFromScan` - Validates every bridge file; single -> use, multiple -> `selectBridge` prompt
+- `vscode_bridge_discovery.go::scanValidBridges` - Returns every bridge file passing `validateBridgeFile`; stale files are left for the extension to clean up (no consumer-side deletion)
+- `vscode_bridge_discovery.go::validateBridgeFile` - Validates one file: permissions, structure, `Secure` flag, token length
+- `vscode_runner.go::NewRunner` - Discovers bridge, creates `client.Client`, loads auth from the discovered token, tests connection
 - `vscode_runner.go::Runner.RunTask` - Looks up task by name, displays info, calls `client.ExecuteTask`
 - `vscode_runner.go::Runner.RunWorkspace` - Looks up workspace, calls `client.ExecuteWorkspace`
-- `vscode_bridge_client.go::NewBridgeClient` - Plain HTTP client constructor given port
-- `vscode_bridge_client.go::BridgeClient.ExecuteTask` - POST JSON to `/task` endpoint
-- `vscode_bridge_client.go::BridgeClient.ExecuteWorkspace` - POST JSON to `/workspace`; aggregates per-task failures
-- `secure_runner.go::NewSecureRunner` - Creates SecureRunner: discovers secure bridge, loads token, tests connection
-- `secure_runner.go::SecureRunner.RunTask` - Same flow as `Runner.RunTask` but uses `SecureClient`
-- `secure_runner.go::SecureRunner.RunWorkspace` - Same flow as `Runner.RunWorkspace` but uses `SecureClient`
-- `security_errors.go::handleSecureError` - Pattern-matches error messages, returns user-friendly hints
+- `security_errors.go::handleBridgeError` - Pattern-matches error messages, returns user-friendly hints
 
 ## Key Files
 
-- **vscode_bridge_discovery.go**: `BridgeInfo` struct; all discovery strategies; bridge validation; interactive selection
-- **vscode_bridge_client.go**: `BridgeClient`; plain HTTP POST; `taskToPayload`/`tasksToPayload` converters
-- **vscode_runner.go**: `Runner`; orchestrates discovery + client + repository + display for plain mode
-- **secure_runner.go**: `SecureRunner`; orchestrates discovery + `SecureClient` + auth for secure mode
-- **security_errors.go**: Error code mapping to user-friendly messages with recovery hints
+- **vscode_bridge_discovery.go**: `BridgeInfo` struct; all discovery strategies; per-file validation; interactive selection; process-tree detection
+- **vscode_runner.go**: `Runner`; orchestrates discovery + `client.Client` + repository + display
+- **security_errors.go**: Error message mapping to user-friendly messages with recovery hints
 
 **Note**: Symbol references use LSP-optimized format (`file::Symbol`) for:
 
@@ -40,26 +34,26 @@ Handles bridge discovery and HTTP communication with the VSTR-Bridge VSCode exte
 
 ## Business Logic
 
-**Bridge discovery order (plain):**
+**Bridge discovery order** (every candidate routed through `validateBridgeFile`, so the result always carries a validated token):
 
-1. `VSTR` env var — fastest; extension sets this in its spawned terminals
-2. Parent process tree scan — walks up 10 levels looking for `code`/`code-insiders`/`electron`
-3. `/tmp/vstr-bridge/*.json` scan — finds all active instances; pings each; removes stale files
-4. If 0 found: error; if 1: return; if 2+: `selectBridge` prompts user via stdin
+1. `VSTR` env var — the per-window signal the extension injects into its terminals. The validated `bridge-<port>.json` is the source of truth; the window-scoped `VSTR_TOKEN` is a resilient fallback when that file is missing/unreadable.
+2. Parent process tree scan — walks up 10 levels looking for `code`/`code-insiders`/`electron`, then matches a validated bridge by workspace path
+3. Directory scan of `/tmp/vstr-bridge/bridge-*.json` — validates each; if 0 found: error; if 1: return; if 2+: `selectBridge` prompts via stdin
 
-**Secure discovery extras:** validates directory permissions <= 0700, per-file permissions via `AuthManager.ValidateFilePermissions`, token length >= 32 bytes, `Secure: true` flag. Returns bridge with highest `InstanceID`.
+**Why VSTR matters:** `VSTR`/`VSTR_TOKEN` are window-scoped (set per VSCode extension host), so when running inside an integrated terminal they unambiguously identify the bridge for *that* window — the only precise signal when multiple VSCode windows are open.
 
-**Execution flow (both modes):**
+**Security validation:** directory permissions <= 0700, per-file permissions via `AuthManager.ValidateFilePermissions`, token length >= 32 bytes, `Secure: true` flag.
 
-1. Discover bridge -> create client (plain or secure)
+**Execution flow:**
+
+1. `DiscoverBridge` -> `NewRunner` creates `client.Client`, loads auth via `LoadAuthFromToken(bridgeInfo.AuthToken)`, runs `TestConnection`
 2. `RunTask(name)` -> `repository.FindTaskByName` -> display info -> `client.ExecuteTask`
-3. Client converts `Task` to `map[string]interface{}` payload via `taskToPayload`
-4. POST to `http://localhost:<port>/task` with `Content-Type: application/json`
-5. Decode response; non-200 -> parse error JSON -> `handleSecureError` (secure path only)
+3. Client converts `Task` to a payload map and POSTs to `http://localhost:<port>/task`
+4. Non-200 -> parse error JSON -> `handleBridgeError`
 
-**Workspace differs from task:** payload includes workspace name + array of task payloads; response includes per-task results; any `success: false` result aggregates into returned error.
+**Workspace differs from task:** payload includes workspace name + array of task payloads; response includes per-task results; any `success: false` result aggregates into the returned error.
 
-**SecureClient** adds `Authorization: Bearer <token>` and `User-Agent: VSTR-CLI/1.0` headers. Uses `context.WithContext` for cancellation (RunTask: 60s, RunWorkspace: 120s).
+**`client.Client`** adds `Authorization: Bearer <token>` and `User-Agent: VSTR-CLI/1.0` headers. Uses context cancellation (RunTask: 60s, RunWorkspace: 120s).
 
 ## Dependencies
 
@@ -67,9 +61,9 @@ Handles bridge discovery and HTTP communication with the VSTR-Bridge VSCode exte
 
 - `internal/models`: `Task`, `Workspace` structs
 - `internal/repository`: `FindTaskByName`, `FindWorkspaceByName`
-- `internal/security`: `AuthManager` — file permission validation, auth header generation
-- `internal/client`: `SecureClient` — authenticated HTTP
-- `pkg/styles`: `PrintInfo`, `PrintWarning`, `PrintError`, `PrintSuccess`, `RunnerTaskNameStyle`
+- `internal/security`: `AuthManager` — file permission validation, `LoadTokenFromBridge`/`LoadTokenFromString`, auth header generation
+- `internal/client`: `Client` — authenticated HTTP; `taskToPayload` lives here
+- `pkg/styles`: `PrintInfo`, `PrintError`, `PrintSuccess`, `RunnerTaskNameStyle`
 
 **External:**
 
@@ -79,47 +73,47 @@ Handles bridge discovery and HTTP communication with the VSTR-Bridge VSCode exte
 **Environment Variables:**
 
 - `VSTR`: Port of the active bridge (set by VSTR-Bridge extension in its terminals)
+- `VSTR_TOKEN`: Auth token of the active bridge (also window-scoped); resilient fallback for auth when the bridge file is unavailable
 - `TMPDIR`/`TEMP`/`TMP`: System temp dir used to locate `/tmp/vstr-bridge` (or Windows equivalent)
 
 ## Architecture
 
-- **Two symmetric paths**: `Runner+BridgeClient` (plain) and `SecureRunner+SecureClient` (auth). Both expose identical `RunTask`/`RunWorkspace` APIs — callers switch with one line.
-- **BridgeInfo as config carrier**: The JSON file written by the extension carries port, PID, InstanceID, workspace path/name, auth token, and secure flag. No separate config files.
-- **Payload decoupling**: `taskToPayload` converts `models.Task` to `map[string]interface{}` to avoid tight coupling with bridge API schema.
+- **Single authenticated path**: `Runner` (orchestration, this package) + `client.Client` (HTTP, `internal/client`). Discovery and transport are decoupled.
+- **BridgeInfo as config carrier**: The JSON file written by the extension carries port, PID, InstanceID, workspace path/name, auth token, and secure flag. `discoverFromEnv`'s fallback synthesizes a `BridgeInfo` from `VSTR`/`VSTR_TOKEN` directly.
+- **Token reuse**: discovery always yields a validated `AuthToken` (from file or `VSTR_TOKEN`), so `NewRunner` authenticates via `LoadAuthFromToken` without re-reading `/tmp`.
 - **Local HTTP only**: no TLS; relies on loopback binding + filesystem permissions + auth token. Acceptable for localhost-only communication.
 
 ## Modification Guide
 
 ### Adding Features
 
-- **New discovery strategy**: add `func discover<Method>() (*BridgeInfo, error)` and call it in `DiscoverBridge` at appropriate priority; return early on success, fall through on error
-- **New execution endpoint**: add method to `BridgeClient` and `SecureClient` following `ExecuteTask` pattern; POST to new `/path`; parse response
-- **New error type from bridge**: add pattern match in `handleSecureError`; provide user-friendly message + `styles.PrintInfo` hint
+- **New discovery strategy**: add `func discoverFrom<Method>(...) (*BridgeInfo, error)` and call it in `DiscoverBridge` at the right priority; return early on success, fall through on error. Route candidates through `validateBridgeFile`.
+- **New execution endpoint**: add a method to `client.Client` following `ExecuteTask`; POST to the new `/path`; parse the response
+- **New error type from bridge**: add a pattern match in `handleBridgeError`; provide a user-friendly message + `styles.PrintInfo` hint
 
 ### Removing Code
 
-- Removing a discovery strategy: ensure remaining strategies still cover all user scenarios
-- Removing `BridgeClient`: also update `vscode_runner.go` and any callers; verify `SecureClient` path still complete
+- Removing a discovery strategy: ensure remaining strategies still cover all user scenarios (especially the `VSTR` env path for multi-window correctness)
 
 ### Common Pitfalls
 
-- `DiscoverBridge` not finding a running bridge -> check `VSTR` env var, verify `/tmp/vstr-bridge/*.json` files exist, check extension is running
-- `SecureRunner` fails with "invalid auth token length" -> bridge file has token < 32 bytes or file permissions > 0700; check extension secure mode settings
+- `DiscoverBridge` not finding a running bridge -> check `VSTR` env var, verify `/tmp/vstr-bridge/bridge-*.json` files exist, check extension is running in secure mode
+- "invalid auth token length" -> bridge file token < 32 bytes (or `VSTR_TOKEN` too short) or file permissions > 0700; check extension secure mode settings
 - `selectBridge` hangs -> stdin not a TTY (script context); set `VSTR` env var to bypass interactive selection
 - Process tree scan misses VSCode -> process renamed or reparented (tmux/SSH/nohup); use `VSTR` env var as fallback
 
 ## Usage Examples
 
 ```go
-// Plain mode
+// Run a single task
 runner, err := vscode.NewRunner()
 if err != nil {
     return err
 }
 return runner.RunTask("build")
 
-// Secure mode
-runner, err := vscode.NewSecureRunner()
+// Run a whole workspace
+runner, err := vscode.NewRunner()
 if err != nil {
     return err
 }
@@ -144,4 +138,4 @@ This CLAUDE.md is my map for navigating this module. I commit to:
 - **Maintain truth** - outdated documentation is a critical bug
 - **Treat this as my compass** - if this map is wrong, I'm lost
 
-Last verified: 2026-02-18
+Last verified: 2026-06-04
