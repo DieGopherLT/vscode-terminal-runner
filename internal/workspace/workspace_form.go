@@ -317,25 +317,26 @@ func submitWorkspaceCmd(w *WorkspaceModel, workspace models.Workspace) tea.Cmd {
 	originalName := w.originalWorkspaceName
 
 	return func() tea.Msg {
-		// Duplicate check (file I/O off UI thread)
-		isRenamingOrCreating := !isEditMode || workspace.Name != originalName
-		if isRenamingOrCreating {
-			_, err := repository.FindWorkspaceByName(workspace.Name)
-			if err == nil {
-				return workspaceSaveResultMsg{err: fmt.Errorf("workspace name already exists")}
+		// Reject collisions: a brand-new workspace, or a rename onto an existing name.
+		// A same-name edit keeps its own slot and is exempt from this check.
+		isClaimingNewName := !isEditMode || workspace.Name != originalName
+		if isClaimingNewName {
+			if _, err := repository.FindWorkspaceByName(workspace.Name); err == nil {
+				return workspaceSaveResultMsg{err: fmt.Errorf("workspace '%s' already exists", workspace.Name)}
 			}
 		}
 
-		// Save first
+		// Edit replaces the original record atomically (handles same-name and rename);
+		// create appends a new one.
+		if isEditMode {
+			if err := repository.UpdateWorkspace(originalName, workspace); err != nil {
+				return workspaceSaveResultMsg{err: err}
+			}
+			return workspaceSaveResultMsg{}
+		}
+
 		if err := repository.SaveWorkspace(workspace); err != nil {
 			return workspaceSaveResultMsg{err: err}
-		}
-
-		// Only delete old record after save succeeds
-		if isEditMode && workspace.Name != originalName {
-			if err := repository.DeleteWorkspace(originalName); err != nil {
-				return workspaceSaveResultMsg{err: fmt.Errorf("saved workspace but failed to remove old record '%s': %w", originalName, err)}
-			}
 		}
 
 		return workspaceSaveResultMsg{}

@@ -18,5 +18,7 @@ func init() {
 
 	workspaceCmd.AddCommand(workspace.CreateCmd)
 	workspaceCmd.AddCommand(workspace.ListCmd)
+	workspaceCmd.AddCommand(workspace.EditCmd)
+	workspaceCmd.AddCommand(workspace.DeleteCmd)
 	workspaceCmd.AddCommand(workspace.RunCmd)
 }
