@@ -35,5 +35,6 @@ go.work.sum
 vstr
 vscode-terminal-runner
 
-# Generated docs
+# Claude related
 .claude/docs/
+.claude/worktrees/
