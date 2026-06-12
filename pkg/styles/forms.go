@@ -2,6 +2,23 @@ package styles
 
 import "github.com/charmbracelet/lipgloss"
 
+// minContainerWidth is the smallest width a bordered container may shrink to
+// before content becomes unreadable on very narrow terminals.
+const minContainerWidth = 20
+
+// ResponsiveContainerWidth returns the width a bordered container should use so
+// it fits the terminal. terminalWidth <= 0 (unknown) falls back to fallback; the
+// result never grows past fallback nor drops below minContainerWidth.
+// horizontalMargin reserves space for surrounding borders and padding.
+func ResponsiveContainerWidth(terminalWidth, fallback, horizontalMargin int) int {
+	if terminalWidth <= 0 {
+		return fallback
+	}
+
+	available := terminalWidth - horizontalMargin
+	return max(minContainerWidth, min(available, fallback))
+}
+
 // Form and input styles
 var (
 	// Input field styles

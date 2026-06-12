@@ -17,7 +17,9 @@ const (
 	maxVisibleTasks      = 6  // Maximum tasks visible at once
 	maxPathDisplayLength = 50 // Maximum characters displayed for path
 	taskNameColumnWidth  = 25 // Fixed width for task name column
-	separatorLineLength  = 88 // Length of separator line in search mode
+
+	defaultSelectorWidth     = 90 // Container width when the terminal size is unknown
+	selectorHorizontalMargin = 4  // Reserved space for form padding and container border
 )
 
 // TaskSelector provides multi-select functionality for tasks with search capabilities.
@@ -29,6 +31,7 @@ type TaskSelector struct {
 	searchInput    textinput.Model
 	isInSearchMode bool
 	maxHeight      int
+	width          int // Terminal width; 0 means unset (use defaults)
 }
 
 // NewTaskSelector creates a new task selector with the given available tasks.
@@ -46,6 +49,17 @@ func NewTaskSelector(availableTasks []models.Task) *TaskSelector {
 		isInSearchMode: false,
 		maxHeight:      maxVisibleTasks,
 	}
+}
+
+// SetWidth stores the terminal width so the selector container, search input,
+// and separator can shrink to fit narrow terminals.
+func (ts *TaskSelector) SetWidth(width int) {
+	ts.width = width
+}
+
+// containerWidth returns the selector container width, clamped to the terminal.
+func (ts *TaskSelector) containerWidth() int {
+	return styles.ResponsiveContainerWidth(ts.width, defaultSelectorWidth, selectorHorizontalMargin)
 }
 
 // GetSelectedTasks returns a slice of currently selected tasks.
@@ -170,6 +184,8 @@ func (ts *TaskSelector) View() string {
 
 	var sections []string
 
+	containerWidth := ts.containerWidth()
+
 	// Header with counter
 	selectedCount := ts.GetSelectedCount()
 	totalTasks := len(ts.availableTasks)
@@ -177,9 +193,9 @@ func (ts *TaskSelector) View() string {
 
 	// Search box (if enabled)
 	if ts.isInSearchMode {
-		searchBox := styles.TextInputStyle.Render(ts.searchInput.View())
+		searchBox := styles.TextInputStyle.Width(containerWidth - 4).Render(ts.searchInput.View())
 		sections = append(sections, searchBox)
-		sections = append(sections, strings.Repeat("─", separatorLineLength))
+		sections = append(sections, strings.Repeat("─", containerWidth-2))
 	}
 
 	// Task list
@@ -199,7 +215,7 @@ func (ts *TaskSelector) View() string {
 	// Container with header
 	container := fmt.Sprintf("%s\n%s",
 		styles.LightGrayStyle.Render(header),
-		styles.TaskSelectorContainerStyle.Render(content),
+		styles.TaskSelectorContainerStyle.Width(containerWidth).Render(content),
 	)
 
 	return container
@@ -268,7 +284,7 @@ func (ts *TaskSelector) renderTaskItem(task models.Task, index int) string {
 // renderEmptyState renders the state when no tasks are available.
 func (ts *TaskSelector) renderEmptyState() string {
 	content := styles.LightGrayStyle.Render("No tasks available.\nCreate some tasks first to add them to workspaces.")
-	return styles.TaskSelectorContainerStyle.Render(content)
+	return styles.TaskSelectorContainerStyle.Width(ts.containerWidth()).Render(content)
 }
 
 // renderHelpText renders context-sensitive help text.

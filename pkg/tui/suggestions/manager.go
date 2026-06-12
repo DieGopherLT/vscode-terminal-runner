@@ -19,6 +19,7 @@ type Manager struct {
 	filterFunc          FilterFunc // Function to filter suggestions
 	lastInput           string     // Last input used for filtering
 	showOnEmpty         bool       // Whether to show suggestions when input is empty
+	maxWidth            int        // Container width override; 0 uses the style default
 }
 
 // NewManager creates a new suggestion manager (shows suggestions on empty input by default)
@@ -40,6 +41,12 @@ func NewManagerWithOptions(suggestions []string, maxVisible int, filterFunc Filt
 		filterFunc:          filterFunc,
 		showOnEmpty:         showOnEmpty,
 	}
+}
+
+// SetMaxWidth sets the container width used when rendering suggestions, so the
+// box can shrink to fit narrow terminals. A value <= 0 keeps the style default.
+func (sm *Manager) SetMaxWidth(width int) {
+	sm.maxWidth = width
 }
 
 // SetSuggestions updates all available suggestions
@@ -157,7 +164,12 @@ func (sm *Manager) Render() string {
 		return styles.SuggestionItemStyle.Render("• " + suggestion)
 	})
 
-	return styles.SuggestionContainerStyle.Render(
+	container := styles.SuggestionContainerStyle
+	if sm.maxWidth > 0 {
+		container = container.Width(sm.maxWidth)
+	}
+
+	return container.Render(
 		lipgloss.JoinVertical(lipgloss.Left, suggestionLines...),
 	)
 }

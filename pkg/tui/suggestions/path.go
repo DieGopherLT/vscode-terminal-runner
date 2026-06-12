@@ -6,8 +6,15 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/samber/lo"
 )
+
+// PathSuggestionsLoadedMsg carries directory suggestions produced by an
+// asynchronous filesystem scan, to be applied on the UI goroutine.
+type PathSuggestionsLoadedMsg struct {
+	Suggestions []string
+}
 
 // PathManager handles autocomplete suggestions for filesystem paths with dynamic directory scanning
 type PathManager struct {
@@ -26,35 +33,59 @@ func NewPathManager(maxVisible int) *PathManager {
 	}
 }
 
-// UpdateFilter overrides the base UpdateFilter to provide dynamic path suggestions
-func (pm *PathManager) UpdateFilter(inputText string) {
+// UpdateFilter overrides the base UpdateFilter to provide dynamic path suggestions.
+// When the directory context changes it returns a command that scans the filesystem
+// off the UI goroutine; the previously known suggestions stay visible until the scan
+// reports back via PathSuggestionsLoadedMsg. Returns nil when no rescan is needed.
+func (pm *PathManager) UpdateFilter(inputText string) tea.Cmd {
 	// Only process if input actually changed
 	if inputText == pm.lastInput {
-		return
+		return nil
 	}
 
 	// Get current directory context from input
 	currentDirectory := pm.getDirectoryContext(inputText)
 
-	// Only regenerate suggestions when directory context changes
+	// Only rescan the filesystem when the directory context changes, and do it
+	// off the UI goroutine so os.ReadDir never blocks the Bubbletea event loop.
+	var scanCmd tea.Cmd
 	if pm.shouldRegeneratePathSuggestions(currentDirectory) {
-		pathSuggestions := pm.generatePathSuggestions(inputText)
-		pm.SetSuggestions(pathSuggestions)
+		scanCmd = pm.scanDirectoryCmd(inputText)
 		pm.lastDirectory = currentDirectory
 	}
 
-	// Update the last input and filter the suggestions manually
+	// Filter the currently known suggestions against the new input immediately.
 	pm.lastInput = inputText
+	pm.filterCurrentInput()
 
-	if inputText == "" {
+	return scanCmd
+}
+
+// ApplyScannedSuggestions stores suggestions produced by an asynchronous directory
+// scan and re-filters them against the current input.
+func (pm *PathManager) ApplyScannedSuggestions(msg PathSuggestionsLoadedMsg) {
+	pm.allSuggestions = msg.Suggestions
+	pm.filterCurrentInput()
+}
+
+// scanDirectoryCmd reads the directory contents off the UI goroutine and reports
+// the resulting suggestions as a PathSuggestionsLoadedMsg.
+func (pm *PathManager) scanDirectoryCmd(inputText string) tea.Cmd {
+	return func() tea.Msg {
+		return PathSuggestionsLoadedMsg{Suggestions: pm.generatePathSuggestions(inputText)}
+	}
+}
+
+// filterCurrentInput narrows allSuggestions by the last input and resets selection.
+func (pm *PathManager) filterCurrentInput() {
+	if pm.lastInput == "" {
 		pm.filteredSuggestions = pm.allSuggestions
 	} else {
 		pm.filteredSuggestions = lo.Filter(pm.allSuggestions, func(suggestion string, _ int) bool {
-			return pm.filterFunc(suggestion, inputText)
+			return pm.filterFunc(suggestion, pm.lastInput)
 		})
 	}
 
-	// Reset selection when filter changes
 	pm.selectedIndex = 0
 }
 
@@ -167,11 +198,12 @@ func (pm *PathManager) expandPath(path string) string {
 	return filepath.Join(homeDirectory, path[2:])
 }
 
-// ApplySelected applies the selected path suggestion to the textinput with path-specific handling
-func (pm *PathManager) ApplySelected(input *textinput.Model) {
+// ApplySelected applies the selected path suggestion to the textinput with path-specific handling.
+// It returns the command produced by refreshing suggestions for the newly applied context.
+func (pm *PathManager) ApplySelected(input *textinput.Model) tea.Cmd {
 	selectedPath := pm.GetSelected()
 	if selectedPath == "" {
-		return
+		return nil
 	}
 
 	input.SetValue(selectedPath)
@@ -180,7 +212,7 @@ func (pm *PathManager) ApplySelected(input *textinput.Model) {
 
 	// After applying a path, update suggestions for the new context
 	// This ensures that if user continues typing, suggestions remain relevant
-	pm.UpdateFilter(selectedPath)
+	return pm.UpdateFilter(selectedPath)
 }
 
 // contractPath converts absolute path back to ~ format if under home directory

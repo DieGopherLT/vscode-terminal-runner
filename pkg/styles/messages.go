@@ -71,25 +71,37 @@ const (
 )
 
 // RenderErrorMessage renders a styled error message with container.
-func RenderErrorMessage(content string) string {
+// maxWidth caps the container width so it fits narrow terminals; 0 uses the default.
+func RenderErrorMessage(content string, maxWidth int) string {
 	message := ErrorMessageStyle.Render(ErrorIcon + " " + content)
-	return ErrorContainerStyle.Render(message)
+	return withContainerWidth(ErrorContainerStyle, maxWidth).Render(message)
 }
 
 // RenderSuccessMessage renders a styled success message with container.
-func RenderSuccessMessage(content string) string {
+// maxWidth caps the container width so it fits narrow terminals; 0 uses the default.
+func RenderSuccessMessage(content string, maxWidth int) string {
 	message := SuccessMessageStyle.Render(SuccessIcon + " " + content)
-	return SuccessContainerStyle.Render(message)
+	return withContainerWidth(SuccessContainerStyle, maxWidth).Render(message)
 }
 
 // RenderWarningMessage renders a styled warning message with container.
-func RenderWarningMessage(content string) string {
+// maxWidth caps the container width so it fits narrow terminals; 0 uses the default.
+func RenderWarningMessage(content string, maxWidth int) string {
 	message := WarningMessageStyle.Render(WarningIcon + " " + content)
-	return WarningContainerStyle.Render(message)
+	return withContainerWidth(WarningContainerStyle, maxWidth).Render(message)
 }
 
 // RenderInfoMessage renders a styled info message with container.
-func RenderInfoMessage(content string) string {
+// maxWidth caps the container width so it fits narrow terminals; 0 uses the default.
+func RenderInfoMessage(content string, maxWidth int) string {
 	message := InfoMessageStyle.Render(InfoIcon + " " + content)
-	return InfoContainerStyle.Render(message)
+	return withContainerWidth(InfoContainerStyle, maxWidth).Render(message)
+}
+
+// withContainerWidth returns a copy of style with width applied when width > 0.
+func withContainerWidth(style lipgloss.Style, width int) lipgloss.Style {
+	if width <= 0 {
+		return style
+	}
+	return style.Width(width)
 }

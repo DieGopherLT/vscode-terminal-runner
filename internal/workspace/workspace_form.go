@@ -86,6 +86,8 @@ func (w *WorkspaceModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		w.nameInput.Width = msg.Width - 10
+		w.taskSelector.SetWidth(msg.Width)
+		w.messages.SetMaxWidth(styles.ResponsiveContainerWidth(msg.Width, 70, 6))
 		return w, nil
 
 	case workspaceSaveResultMsg:

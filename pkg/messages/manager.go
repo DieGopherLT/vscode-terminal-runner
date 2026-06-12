@@ -13,6 +13,7 @@ type MessageManager struct {
 	showMessages bool
 	errors       []string
 	messages     []Message
+	maxWidth     int // Container width override; 0 uses the style default
 }
 
 // NewManager creates a new MessageManager instance.
@@ -23,6 +24,12 @@ func NewManager() *MessageManager {
 		errors:       make([]string, 0),
 		messages:     make([]Message, 0),
 	}
+}
+
+// SetMaxWidth sets the container width used when rendering messages, so the
+// boxes can shrink to fit narrow terminals. A value <= 0 keeps the style default.
+func (m *MessageManager) SetMaxWidth(width int) {
+	m.maxWidth = width
 }
 
 // AddError adds an error message to be displayed.
@@ -103,7 +110,7 @@ func (m *MessageManager) Render() string {
 	// Render error messages
 	if m.HasErrors() {
 		errorMessages := lo.Map(m.errors, func(err string, _ int) string {
-			return renderMessage(Error, err)
+			return renderMessage(Error, err, m.maxWidth)
 		})
 		sections = append(sections, strings.Join(errorMessages, "\n"))
 	}
@@ -111,7 +118,7 @@ func (m *MessageManager) Render() string {
 	// Render other messages
 	if m.HasNonErrorMessages() {
 		otherMessages := lo.Map(m.messages, func(msg Message, _ int) string {
-			return renderMessage(msg.Type, msg.Content)
+			return renderMessage(msg.Type, msg.Content, m.maxWidth)
 		})
 		sections = append(sections, strings.Join(otherMessages, "\n"))
 	}
@@ -120,16 +127,17 @@ func (m *MessageManager) Render() string {
 }
 
 // renderMessage returns a styled message based on its type using proper styles.
-func renderMessage(msgType MessageType, content string) string {
+// maxWidth caps the container width so messages fit narrow terminals; 0 uses the default.
+func renderMessage(msgType MessageType, content string, maxWidth int) string {
 	switch msgType {
 	case Error:
-		return styles.RenderErrorMessage(content)
+		return styles.RenderErrorMessage(content, maxWidth)
 	case Success:
-		return styles.RenderSuccessMessage(content)
+		return styles.RenderSuccessMessage(content, maxWidth)
 	case Warning:
-		return styles.RenderWarningMessage(content)
+		return styles.RenderWarningMessage(content, maxWidth)
 	case Info:
-		return styles.RenderInfoMessage(content)
+		return styles.RenderInfoMessage(content, maxWidth)
 	default:
 		return content
 	}

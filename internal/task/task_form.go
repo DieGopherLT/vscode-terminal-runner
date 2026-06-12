@@ -31,6 +31,15 @@ func (t *TaskModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		for i := range t.inputs {
 			t.inputs[i].Width = msg.Width - 10
 		}
+		suggestionWidth := styles.ResponsiveContainerWidth(msg.Width, 58, 6)
+		t.pathSuggestions.SetMaxWidth(suggestionWidth)
+		t.iconSuggestions.SetMaxWidth(suggestionWidth)
+		t.colorSuggestions.SetMaxWidth(suggestionWidth)
+		t.messages.SetMaxWidth(styles.ResponsiveContainerWidth(msg.Width, 70, 6))
+		return t, nil
+
+	case suggestions.PathSuggestionsLoadedMsg:
+		t.pathSuggestions.ApplyScannedSuggestions(msg)
 		return t, nil
 
 	case taskSaveResultMsg:
@@ -58,8 +67,7 @@ func (t *TaskModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// If Tab pressed and suggestions available, apply suggestion
 			if key.Matches(msg, tui.DefaultKeys.Tab) {
 				if t.nav.FocusIndex == pathField && t.pathSuggestions.ShouldShow(t.inputs[t.nav.FocusIndex].Value()) {
-					t.pathSuggestions.ApplySelected(&t.inputs[t.nav.FocusIndex])
-					return t, nil
+					return t, t.pathSuggestions.ApplySelected(&t.inputs[t.nav.FocusIndex])
 				}
 				if manager := t.getCurrentSuggestionManager(); manager != nil && manager.ShouldShow(t.inputs[t.nav.FocusIndex].Value()) {
 					manager.ApplySelected(&t.inputs[t.nav.FocusIndex])
@@ -93,8 +101,7 @@ func (t *TaskModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, tui.DefaultKeys.Enter):
 			// If there are suggestions, apply the selected one
 			if t.nav.FocusIndex == pathField && t.pathSuggestions.ShouldShow(t.inputs[t.nav.FocusIndex].Value()) {
-				t.pathSuggestions.ApplySelected(&t.inputs[t.nav.FocusIndex])
-				return t, nil
+				return t, t.pathSuggestions.ApplySelected(&t.inputs[t.nav.FocusIndex])
 			}
 			if manager := t.getCurrentSuggestionManager(); manager != nil && manager.ShouldShow(t.inputs[t.nav.FocusIndex].Value()) {
 				manager.ApplySelected(&t.inputs[t.nav.FocusIndex])
@@ -166,7 +173,7 @@ func (t *TaskModel) HandleInput(msg tea.Msg) tea.Cmd {
 
 		// Update suggestion managers based on input changes
 		if i == pathField && i == t.nav.FocusIndex {
-			t.pathSuggestions.UpdateFilter(t.inputs[i].Value())
+			cmds = append(cmds, t.pathSuggestions.UpdateFilter(t.inputs[i].Value()))
 		}
 
 		if i == iconField && i == t.nav.FocusIndex {
