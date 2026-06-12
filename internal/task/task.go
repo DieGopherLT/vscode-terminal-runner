@@ -8,6 +8,7 @@ import (
 	"github.com/DieGopherLT/vscode-terminal-runner/pkg/styles"
 	"github.com/DieGopherLT/vscode-terminal-runner/pkg/tui"
 	"github.com/DieGopherLT/vscode-terminal-runner/pkg/tui/suggestions"
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/samber/lo"
@@ -21,6 +22,8 @@ type TaskModel struct {
 	colorSuggestions *suggestions.Manager
 	pathSuggestions  *suggestions.PathManager
 	messages         *messages.MessageManager
+	spinner          spinner.Model
+	isSubmitting     bool
 	isEditMode       bool
 	originalTaskName string
 }
@@ -43,6 +46,10 @@ func newModelInternal(existingTask *models.Task) tea.Model {
 	iconNames := lo.Map(styles.VSCodeIcons, func(i styles.VSCodeIcon, _ int) string { return i.Name })
 	colorNames := lo.Map(styles.VSCodeANSIColors, func(c styles.VSCodeANSIColor, _ int) string { return c.Name })
 
+	submitSpinner := spinner.New()
+	submitSpinner.Spinner = spinner.Dot
+	submitSpinner.Style = styles.FocusedInputStyle
+
 	model := &TaskModel{
 		inputs:           make([]textinput.Model, numberOfFields),
 		nav:              tui.NewNavigator(numberOfFields),
@@ -50,6 +57,7 @@ func newModelInternal(existingTask *models.Task) tea.Model {
 		colorSuggestions: suggestions.NewManager(colorNames, 3, suggestions.ContainsFilter),
 		pathSuggestions:  suggestions.NewPathManager(5),
 		messages:         messages.NewManager(),
+		spinner:          submitSpinner,
 		isEditMode:       existingTask != nil,
 		originalTaskName: "",
 	}

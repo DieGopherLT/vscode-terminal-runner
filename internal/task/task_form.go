@@ -6,6 +6,7 @@ import (
 	"github.com/DieGopherLT/vscode-terminal-runner/pkg/tui"
 	"github.com/DieGopherLT/vscode-terminal-runner/pkg/tui/suggestions"
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -42,7 +43,16 @@ func (t *TaskModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		t.pathSuggestions.ApplyScannedSuggestions(msg)
 		return t, nil
 
+	case spinner.TickMsg:
+		if !t.isSubmitting {
+			return t, nil
+		}
+		var cmd tea.Cmd
+		t.spinner, cmd = t.spinner.Update(msg)
+		return t, cmd
+
 	case taskSaveResultMsg:
+		t.isSubmitting = false
 		if msg.err != nil {
 			t.messages.AddError(msg.err.Error())
 			return t, nil
@@ -117,7 +127,8 @@ func (t *TaskModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return t, nil
 			}
 
-			return t, submitTaskCmd(t, task)
+			t.isSubmitting = true
+			return t, tea.Batch(submitTaskCmd(t, task), t.spinner.Tick)
 		}
 	}
 
@@ -240,18 +251,31 @@ func (t *TaskModel) View() string {
 	}
 
 	button := styles.RenderBlurredButton("Submit")
-	if t.nav.FocusIndex == len(t.inputs) {
+	switch {
+	case t.isSubmitting:
+		button = styles.RenderBlurredButton(t.spinner.View() + "Saving...")
+	case t.nav.FocusIndex == len(t.inputs):
 		button = styles.RenderFocusedButton("Submit")
 	}
 
 	sections = append(sections, button)
-
-	helpText := styles.HelpTextStyle.Render("up/down navigate • ctrl+b/n suggestions • tab/enter apply • esc quit")
-	sections = append(sections, helpText)
+	sections = append(sections, t.renderHelpText())
 
 	return styles.FormContainerStyle.Render(
 		lipgloss.JoinVertical(lipgloss.Left, sections...),
 	)
+}
+
+// renderHelpText renders context-sensitive help text based on the focused field.
+func (t *TaskModel) renderHelpText() string {
+	switch t.nav.FocusIndex {
+	case nameField, cmdsField:
+		return styles.HelpTextStyle.Render("up/down/tab/shift+tab navigate • esc quit")
+	case pathField, iconField, iconColorField:
+		return styles.HelpTextStyle.Render("up/down navigate • ctrl+b/n cycle suggestions • tab/enter apply • esc quit")
+	default:
+		return styles.HelpTextStyle.Render("enter submit • esc quit")
+	}
 }
 
 // getCurrentSuggestionManager returns the suggestion manager for icon/color fields.

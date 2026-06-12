@@ -75,13 +75,14 @@ var (
 			Bold(true).
 			MarginBottom(1)
 
-	// Task selector specific styles
+	// Task selector specific styles.
+	// Height is intentionally not set: a fixed Height on a bordered style clips
+	// overflowing content. renderTaskList pads the list to a stable height instead.
 	TaskSelectorContainerStyle = lipgloss.NewStyle().
 					Border(lipgloss.RoundedBorder()).
 					BorderForeground(GrayBlue).
 					Padding(0, 1).
-					Width(90).
-					Height(9)
+					Width(90)
 
 	SelectedTaskStyle = lipgloss.NewStyle().
 				Foreground(VSCodeBlue).

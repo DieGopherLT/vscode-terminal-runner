@@ -17,10 +17,22 @@ func (t TaskModel) handleTaskCreation() models.Task {
 	return models.Task{
 		Name:      t.inputs[nameField].Value(),
 		Path:      t.inputs[pathField].Value(),
-		Cmds:      strings.Split(t.inputs[cmdsField].Value(), ","),
+		Cmds:      parseCommands(t.inputs[cmdsField].Value()),
 		Icon:      t.inputs[iconField].Value(),
 		IconColor: t.inputs[iconColorField].Value(),
 	}
+}
+
+// parseCommands splits a comma-separated command string, trimming whitespace
+// around each command and dropping empty entries so leading spaces never reach
+// the terminal (e.g. "yarn install, yarn dev" -> ["yarn install", "yarn dev"]).
+func parseCommands(raw string) []string {
+	trimmed := lo.Map(strings.Split(raw, ","), func(cmd string, _ int) string {
+		return strings.TrimSpace(cmd)
+	})
+	return lo.Filter(trimmed, func(cmd string, _ int) bool {
+		return cmd != ""
+	})
 }
 
 // saveTask saves a task to the local configuration file.
@@ -67,7 +79,7 @@ func (t *TaskModel) isValidTask(task models.Task) bool {
 		t.messages.AddError("Name is required")
 	}
 
-	if len(task.Cmds) == 0 || (len(task.Cmds) == 1 && strings.TrimSpace(task.Cmds[0]) == "") {
+	if len(task.Cmds) == 0 {
 		t.messages.AddError("At least one command is required")
 	}
 

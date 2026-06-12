@@ -202,12 +202,8 @@ func (ts *TaskSelector) View() string {
 	taskList := ts.renderTaskList()
 	sections = append(sections, taskList)
 
-	// Add spacing before help text
-	sections = append(sections, "")
-
-	// Help text
-	helpText := ts.renderHelpText()
-	sections = append(sections, helpText)
+	// Help text is rendered by the parent form (WorkspaceModel.renderHelpText)
+	// to avoid duplicating the shortcut hints inside and outside the container.
 
 	// Combine all sections
 	content := strings.Join(sections, "\n")
@@ -223,28 +219,35 @@ func (ts *TaskSelector) View() string {
 
 // renderTaskList renders the scrollable list of tasks.
 func (ts *TaskSelector) renderTaskList() string {
-	if len(ts.filteredTasks) == 0 {
-		return styles.LightGrayStyle.Render("No tasks match your search.")
-	}
-
 	var items []string
-	startIndex := 0
-	endIndex := len(ts.filteredTasks)
 
-	// Handle scrolling for long lists
-	if len(ts.filteredTasks) > ts.maxHeight {
-		if ts.focusedIndex >= ts.maxHeight {
-			startIndex = ts.focusedIndex - ts.maxHeight + 1
+	if len(ts.filteredTasks) == 0 {
+		items = append(items, styles.LightGrayStyle.Render("No tasks match your search."))
+	} else {
+		startIndex := 0
+		endIndex := len(ts.filteredTasks)
+
+		// Handle scrolling for long lists
+		if len(ts.filteredTasks) > ts.maxHeight {
+			if ts.focusedIndex >= ts.maxHeight {
+				startIndex = ts.focusedIndex - ts.maxHeight + 1
+			}
+			endIndex = startIndex + ts.maxHeight
+			if endIndex > len(ts.filteredTasks) {
+				endIndex = len(ts.filteredTasks)
+			}
 		}
-		endIndex = startIndex + ts.maxHeight
-		if endIndex > len(ts.filteredTasks) {
-			endIndex = len(ts.filteredTasks)
+
+		for i := startIndex; i < endIndex; i++ {
+			item := ts.renderTaskItem(ts.filteredTasks[i], i)
+			items = append(items, item)
 		}
 	}
 
-	for i := startIndex; i < endIndex; i++ {
-		item := ts.renderTaskItem(ts.filteredTasks[i], i)
-		items = append(items, item)
+	// Pad to a stable height so the bordered container does not resize (and clip)
+	// as the filtered list grows or shrinks.
+	for len(items) < ts.maxHeight {
+		items = append(items, "")
 	}
 
 	return strings.Join(items, "\n")
@@ -287,17 +290,11 @@ func (ts *TaskSelector) renderEmptyState() string {
 	return styles.TaskSelectorContainerStyle.Width(ts.containerWidth()).Render(content)
 }
 
-// renderHelpText renders context-sensitive help text.
-func (ts *TaskSelector) renderHelpText() string {
-	if ts.isInSearchMode {
-		return styles.LightGrayStyle.Render("esc exit search • enter confirm")
-	}
-	return styles.LightGrayStyle.Render("↑/↓ navigate • space toggle • /search • ctrl+a select all • tab/shift+tab navigate")
-}
-
 // truncatePath truncates a path to fit within the specified width, adding ellipsis if needed.
+// Width is measured in runes so multi-byte characters do not break column alignment.
 func truncatePath(path string, maxWidth int) string {
-	if len(path) <= maxWidth {
+	runes := []rune(path)
+	if len(runes) <= maxWidth {
 		return path
 	}
 
@@ -305,16 +302,18 @@ func truncatePath(path string, maxWidth int) string {
 		return "..."
 	}
 
-	return "..." + path[len(path)-maxWidth+3:]
+	return "..." + string(runes[len(runes)-maxWidth+3:])
 }
 
 // padRight pads a string to a fixed width using spaces, truncating with ellipsis if necessary.
+// Width is measured in runes so multi-byte characters do not break column alignment.
 func padRight(text string, width int) string {
-	if len(text) > width {
-		return text[:width-3] + "..."
+	runes := []rune(text)
+	if len(runes) > width {
+		return string(runes[:width-3]) + "..."
 	}
 
-	paddingNeeded := width - len(text)
+	paddingNeeded := width - len(runes)
 	if paddingNeeded <= 0 {
 		return text
 	}

@@ -11,6 +11,7 @@ import (
 	"github.com/DieGopherLT/vscode-terminal-runner/pkg/styles"
 	"github.com/DieGopherLT/vscode-terminal-runner/pkg/tui"
 	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -27,6 +28,8 @@ type WorkspaceModel struct {
 	nameInput             textinput.Model
 	taskSelector          *components.TaskSelector
 	messages              *messages.MessageManager
+	spinner               spinner.Model
+	isSubmitting          bool
 	isEditMode            bool
 	originalWorkspaceName string
 }
@@ -66,11 +69,16 @@ func newWorkspaceModelInternal(workspace *models.Workspace) *WorkspaceModel {
 		taskSelector.SetSelectedTasks(workspace.Tasks)
 	}
 
+	submitSpinner := spinner.New()
+	submitSpinner.Spinner = spinner.Dot
+	submitSpinner.Style = styles.FocusedInputStyle
+
 	return &WorkspaceModel{
 		nav:                   nav,
 		nameInput:             nameInput,
 		taskSelector:          taskSelector,
 		messages:              messages.NewManager(),
+		spinner:               submitSpinner,
 		isEditMode:            isEditMode,
 		originalWorkspaceName: originalWorkspaceName,
 	}
@@ -90,7 +98,16 @@ func (w *WorkspaceModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		w.messages.SetMaxWidth(styles.ResponsiveContainerWidth(msg.Width, 70, 6))
 		return w, nil
 
+	case spinner.TickMsg:
+		if !w.isSubmitting {
+			return w, nil
+		}
+		var cmd tea.Cmd
+		w.spinner, cmd = w.spinner.Update(msg)
+		return w, cmd
+
 	case workspaceSaveResultMsg:
+		w.isSubmitting = false
 		if msg.err != nil {
 			w.messages.AddError(fmt.Sprintf("Failed to save workspace: %v", msg.err))
 			return w, nil
@@ -278,13 +295,20 @@ func (w *WorkspaceModel) applyFocus() {
 
 // handleSubmit validates and kicks off async workspace persistence.
 func (w *WorkspaceModel) handleSubmit() (tea.Model, tea.Cmd) {
+	// Ignore re-submission while a save is already in flight to avoid a
+	// concurrent second persistence racing on the same workspaces file.
+	if w.isSubmitting {
+		return w, nil
+	}
+
 	workspace := w.createWorkspaceFromForm()
 
 	if !w.isValidWorkspace(workspace) {
 		return w, nil
 	}
 
-	return w, submitWorkspaceCmd(w, workspace)
+	w.isSubmitting = true
+	return w, tea.Batch(submitWorkspaceCmd(w, workspace), w.spinner.Tick)
 }
 
 // submitWorkspaceCmd performs duplicate-check and save off the UI goroutine.
@@ -375,7 +399,10 @@ func (w *WorkspaceModel) View() string {
 	}
 
 	button := styles.RenderBlurredButton("Submit")
-	if w.nav.FocusIndex >= w.nav.GetElementCount() {
+	switch {
+	case w.isSubmitting:
+		button = styles.RenderBlurredButton(w.spinner.View() + "Saving...")
+	case w.nav.FocusIndex >= w.nav.GetElementCount():
 		button = styles.RenderFocusedButton("Submit")
 	}
 	sections = append(sections, button)
