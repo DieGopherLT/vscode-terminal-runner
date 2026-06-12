@@ -61,10 +61,11 @@ var ListCmd = &cobra.Command{
 
 // DeleteCmd deletes a task specified by name.
 var DeleteCmd = &cobra.Command{
-	Use:   "delete <name>",
-	Short: "Delete a task",
-	Long:  `Delete a task with the specified name`,
-	Args:  cobra.ExactArgs(1),
+	Use:               "delete <name>",
+	Short:             "Delete a task",
+	Long:              `Delete a task with the specified name`,
+	Args:              cobra.ExactArgs(1),
+	ValidArgsFunction: completeTaskNames,
 	Run: func(cmd *cobra.Command, args []string) {
 		taskName := args[0]
 
@@ -79,10 +80,11 @@ var DeleteCmd = &cobra.Command{
 
 // EditCmd starts the TUI form to edit an existing task.
 var EditCmd = &cobra.Command{
-	Use:   "edit <name>",
-	Short: "Edit an existing task",
-	Long:  `Edit an existing task with the specified name`,
-	Args:  cobra.ExactArgs(1),
+	Use:               "edit <name>",
+	Short:             "Edit an existing task",
+	Long:              `Edit an existing task with the specified name`,
+	Args:              cobra.ExactArgs(1),
+	ValidArgsFunction: completeTaskNames,
 	Run: func(cmd *cobra.Command, args []string) {
 		taskName := args[0]
 
@@ -102,10 +104,11 @@ var EditCmd = &cobra.Command{
 }
 
 var RunCmd = &cobra.Command{
-	Use:   "run <name>",
-	Short: "Run a task",
-	Long:  `Run a task with the specified name`,
-	Args:  cobra.ExactArgs(1),
+	Use:               "run <name>",
+	Short:             "Run a task",
+	Long:              `Run a task with the specified name`,
+	Args:              cobra.ExactArgs(1),
+	ValidArgsFunction: completeTaskNames,
 	Run: func(cmd *cobra.Command, args []string) {
 		taskName := args[0]
 

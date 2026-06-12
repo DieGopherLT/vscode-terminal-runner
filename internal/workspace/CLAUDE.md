@@ -15,6 +15,7 @@ Bubbletea TUI for workspace CRUD and execution. A workspace is a named group of 
 - `workspace_form.go::NewEditWorkspaceModel` - TUI model constructor for edit mode (pre-fills fields)
 - `workspace_create.go::CreateWorkspaceCommand` - Wraps TUI program; entry point from CLI
 - `workspace_create.go::EditWorkspaceCommand` - Loads workspace, wraps TUI program for editing
+- `workspace_completion.go::completeWorkspaceNames` - Cobra `ValidArgsFunction` for `run`: prefix-filters workspace names from the repository for shell completion
 - `components/task_selector.go::NewTaskSelector` - Reusable multi-select component with search
 
 ## Key Files
@@ -22,6 +23,7 @@ Bubbletea TUI for workspace CRUD and execution. A workspace is a named group of 
 - **workspace_form.go**: `WorkspaceModel` struct; `Init`, `Update`, `View`; validation; save logic
 - **workspace_commands.go**: Cobra command definitions with argument validation
 - **workspace_create.go**: Runs `tea.NewProgram`; bridges CLI args to TUI
+- **workspace_completion.go**: `completeWorkspaceNames` — shell completion source; reads `repository.ReadWorkspaces`, filters by `strings.HasPrefix` against the name, emits `"name\ttask-names"` (a workspace has no command/path of its own), returns `ShellCompDirectiveNoFileComp`. No discovery, no network.
 - **components/task_selector.go**: `TaskSelector`; search, filter, toggle, select-all, scroll
 
 **Note**: Symbol references use LSP-optimized format (`file::Symbol`) for:
@@ -139,4 +141,4 @@ This CLAUDE.md is my map for navigating this module. I commit to:
 - **Maintain truth** - outdated documentation is a critical bug
 - **Treat this as my compass** - if this map is wrong, I'm lost
 
-Last verified: 2026-02-20
+Last verified: 2026-06-12

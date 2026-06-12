@@ -17,6 +17,7 @@ Bubbletea TUI for task CRUD and execution. Exposes Cobra commands and interactiv
 - `task_commands.go::RunCmd` - Cobra: executes task via SecureRunner
 - `task_create.go::DeleteTask` - Helper wrapping `repository.DeleteTask`
 - `task_list.go::FindByName` - Helper wrapping `repository.FindTaskByName`
+- `task_completion.go::completeTaskNames` - Cobra `ValidArgsFunction` for `run`/`delete`/`edit`: prefix-filters task names from the repository for shell completion
 
 ## Key Files
 
@@ -25,6 +26,7 @@ Bubbletea TUI for task CRUD and execution. Exposes Cobra commands and interactiv
 - **task_commands.go**: Cobra command definitions with flag registration
 - **task_create.go**: Validation (`isValidTask`), form-to-struct (`handleTaskCreation`), path expansion, `saveTask`, batch import
 - **task_list.go**: Tabular and name-only list rendering
+- **task_completion.go**: `completeTaskNames` — shell completion source; reads `repository.ReadTasks`, filters by `strings.HasPrefix` against the name, emits `"name\tcommands"`, returns `ShellCompDirectiveNoFileComp`. No discovery, no network.
 
 **Note**: Symbol references use LSP-optimized format (`file::Symbol`) for:
 
@@ -132,4 +134,4 @@ This CLAUDE.md is my map for navigating this module. I commit to:
 - **Maintain truth** - outdated documentation is a critical bug
 - **Treat this as my compass** - if this map is wrong, I'm lost
 
-Last verified: 2026-02-20
+Last verified: 2026-06-12

@@ -10,10 +10,11 @@ import (
 
 // RunCmd runs a workspace by name
 var RunCmd = &cobra.Command{
-	Use:   "run <name>",
-	Short: "Run a workspace",
-	Long:  `Execute all tasks defined in a workspace`,
-	Args:  cobra.ExactArgs(1),
+	Use:               "run <name>",
+	Short:             "Run a workspace",
+	Long:              `Execute all tasks defined in a workspace`,
+	Args:              cobra.ExactArgs(1),
+	ValidArgsFunction: completeWorkspaceNames,
 	Run: func(cmd *cobra.Command, args []string) {
 		workspaceName := args[0]
 
