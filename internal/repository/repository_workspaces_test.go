@@ -290,3 +290,78 @@ func TestFilterOutWorkspaceByName_onEmptySliceReturnsEmpty(t *testing.T) {
 		t.Fatalf("expected 0 workspaces for nil input, got %d", len(result))
 	}
 }
+
+func TestUpdateWorkspace_successfullyReplacesWorkspace(t *testing.T) {
+	defer redirectWorkspacesSaveFile(t)()
+
+	original := testutils.NewWorkspace().WithName("original").Build()
+	if err := SaveWorkspace(original); err != nil {
+		t.Fatalf("setup SaveWorkspace failed: %v", err)
+	}
+
+	updated := testutils.NewWorkspace().WithName("renamed").Build()
+	if err := UpdateWorkspace("original", updated); err != nil {
+		t.Fatalf("UpdateWorkspace returned unexpected error: %v", err)
+	}
+
+	workspaces, err := ReadWorkspaces()
+	if err != nil {
+		t.Fatalf("ReadWorkspaces after UpdateWorkspace returned unexpected error: %v", err)
+	}
+	if len(workspaces) != 1 {
+		t.Fatalf("expected 1 workspace after update, got %d", len(workspaces))
+	}
+	if workspaces[0].Name != "renamed" {
+		t.Fatalf("expected updated workspace name %q, got %q", "renamed", workspaces[0].Name)
+	}
+}
+
+func TestUpdateWorkspace_returnsErrorWhenNameNotFound(t *testing.T) {
+	defer redirectWorkspacesSaveFile(t)()
+
+	updated := testutils.NewWorkspace().WithName("new-name").Build()
+	err := UpdateWorkspace("nonexistent", updated)
+	if err == nil {
+		t.Fatal("UpdateWorkspace should return an error for a missing workspace name")
+	}
+}
+
+func TestUpdateWorkspace_returnsErrorOnCorruptJSON(t *testing.T) {
+	defer redirectWorkspacesSaveFile(t)()
+
+	if _, err := ReadWorkspaces(); err != nil {
+		t.Fatalf("setup ReadWorkspaces failed: %v", err)
+	}
+	if err := os.WriteFile(WorkspacesSaveFile, []byte("{not valid json"), 0666); err != nil {
+		t.Fatalf("failed to write corrupt JSON: %v", err)
+	}
+
+	err := UpdateWorkspace("any", models.Workspace{Name: "any"})
+	if err == nil {
+		t.Fatal("UpdateWorkspace should return an error when workspaces.json contains corrupt JSON")
+	}
+}
+
+func TestReplaceWorkspaceByName_replacesCorrectEntry(t *testing.T) {
+	workspaces := []models.Workspace{{Name: "old"}, {Name: "keep"}}
+	updated := models.Workspace{Name: "new"}
+
+	result, err := replaceWorkspaceByName(workspaces, "old", updated)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result[0].Name != "new" {
+		t.Fatalf("expected first workspace to be renamed to %q, got %q", "new", result[0].Name)
+	}
+	if result[1].Name != "keep" {
+		t.Fatalf("expected second workspace to remain %q, got %q", "keep", result[1].Name)
+	}
+}
+
+func TestReplaceWorkspaceByName_returnsErrorForMissingName(t *testing.T) {
+	workspaces := []models.Workspace{{Name: "alpha"}}
+	_, err := replaceWorkspaceByName(workspaces, "nonexistent", models.Workspace{})
+	if err == nil {
+		t.Fatal("expected an error for a missing workspace name")
+	}
+}

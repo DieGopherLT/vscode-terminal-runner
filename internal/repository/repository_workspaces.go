@@ -125,6 +125,47 @@ func SaveWorkspace(workspace models.Workspace) error {
 	return os.WriteFile(WorkspacesSaveFile, newJsonContent, 0666)
 }
 
+// UpdateWorkspace replaces the workspace stored under originalName with updatedWorkspace.
+// The replacement is a single atomic write, so a rename never leaves the file with a
+// duplicate or a missing record.
+func UpdateWorkspace(originalName string, updatedWorkspace models.Workspace) error {
+	ensureWorkspacesSaveFile()
+	if err := os.MkdirAll(path.Dir(WorkspacesSaveFile), 0755); err != nil {
+		return err
+	}
+
+	file, err := os.OpenFile(WorkspacesSaveFile, os.O_RDWR|os.O_CREATE, 0666)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	jsonContent, err := io.ReadAll(file)
+	if err != nil {
+		return err
+	}
+
+	var content WorkspaceSaveFileContent
+	if len(jsonContent) > 0 {
+		if err = json.Unmarshal(jsonContent, &content); err != nil {
+			return err
+		}
+	}
+
+	updated, err := replaceWorkspaceByName(content.Workspaces, originalName, updatedWorkspace)
+	if err != nil {
+		return err
+	}
+	content.Workspaces = updated
+
+	newJsonContent, err := json.Marshal(content)
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(WorkspacesSaveFile, newJsonContent, 0666)
+}
+
 // appendWorkspaceIfUnique returns a new slice with workspace appended, or an error when
 // a workspace with the same name already exists. Pure: no I/O.
 func appendWorkspaceIfUnique(workspaces []models.Workspace, workspace models.Workspace) ([]models.Workspace, error) {
@@ -180,4 +221,20 @@ func filterOutWorkspaceByName(workspaces []models.Workspace, name string) []mode
 	return lo.Filter(workspaces, func(ws models.Workspace, _ int) bool {
 		return ws.Name != name
 	})
+}
+
+// replaceWorkspaceByName returns a copy of workspaces with the entry matching originalName
+// replaced by updatedWorkspace. Returns an error when the name is not found. Pure: no I/O.
+func replaceWorkspaceByName(workspaces []models.Workspace, originalName string, updatedWorkspace models.Workspace) ([]models.Workspace, error) {
+	_, index, found := lo.FindIndexOf(workspaces, func(ws models.Workspace) bool {
+		return ws.Name == originalName
+	})
+	if !found {
+		return nil, fmt.Errorf("workspace '%s' not found", originalName)
+	}
+
+	result := make([]models.Workspace, len(workspaces))
+	copy(result, workspaces)
+	result[index] = updatedWorkspace
+	return result, nil
 }

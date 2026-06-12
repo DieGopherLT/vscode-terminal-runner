@@ -9,6 +9,8 @@ Bubbletea TUI for workspace CRUD and execution. A workspace is a named group of 
 ## Entry Points
 
 - `workspace_commands.go::CreateCmd` - Cobra: opens TUI to create a new workspace
+- `workspace_commands.go::EditCmd` - Cobra: opens pre-filled TUI for an existing workspace
+- `workspace_commands.go::DeleteCmd` - Cobra: deletes workspace by name (guards existence first)
 - `workspace_commands.go::RunCmd` - Cobra: runs workspace by name via `SecureRunner`
 - `workspace_commands.go::ListCmd` - Cobra: lists workspaces (stub, not yet implemented)
 - `workspace_form.go::NewWorkspaceModel` - TUI model constructor for create mode
@@ -43,9 +45,9 @@ Bubbletea TUI for workspace CRUD and execution. A workspace is a named group of 
 | 1 | Task Selector | Multi-select; warns but allows empty selection |
 | 2 | Submit button | `FocusIndex == elementCount` (2) triggers submit on Enter |
 
-**Submission flow:** Enter on Submit -> `isValidWorkspace` (in-memory only) -> if valid, `submitWorkspaceCmd` runs async: delete old if renamed -> `repository.SaveWorkspace` -> `workspaceSaveResultMsg` -> `tea.Quit`.
+**Submission flow:** Enter on Submit -> `isValidWorkspace` (in-memory only) -> if valid, `submitWorkspaceCmd` runs async: reject name collision for create/rename -> `repository.UpdateWorkspace` (edit) or `repository.SaveWorkspace` (create) -> `workspaceSaveResultMsg` -> `tea.Quit`.
 
-**Edit mode:** if name changed, `saveWorkspace` calls `repository.DeleteWorkspace(originalName)` first, then saves new. `originalWorkspaceName` stored at init.
+**Edit mode:** `submitWorkspaceCmd` calls `repository.UpdateWorkspace(originalName, workspace)` — an atomic replace by original name that covers both same-name updates and renames. A rename onto an already-taken name is rejected up front. `originalWorkspaceName` stored at init.
 
 **Task selector interaction:**
 
@@ -69,7 +71,7 @@ Bubbletea TUI for workspace CRUD and execution. A workspace is a named group of 
 **Internal:**
 
 - `internal/models`: `Task`, `Workspace` structs
-- `internal/repository`: `GetAllTasks`, `FindWorkspaceByName`, `SaveWorkspace`, `DeleteWorkspace`
+- `internal/repository`: `GetAllTasks`, `FindWorkspaceByName`, `SaveWorkspace`, `UpdateWorkspace`, `DeleteWorkspace`
 - `internal/vscode`: `NewSecureRunner` -> `RunWorkspace` for execution
 - `pkg/tui`: `FormNavigator` for field focus cycling
 - `pkg/messages`: `MessageManager` — `AddError`, `AddWarning`, `AddSuccess`, `Render`
@@ -100,13 +102,13 @@ Bubbletea TUI for workspace CRUD and execution. A workspace is a named group of 
 
 ### Removing Code
 
-- Removing `ListCmd`: also remove registration in `cmd/workspace.go`
+- Removing any command (`CreateCmd`, `EditCmd`, `DeleteCmd`, `ListCmd`, `RunCmd`): also remove its registration in `cmd/workspace.go`
 - Removing `TaskSelector` search: remove search input, `showSearch` flag, and search key handlers from `Update`
 
 ### Common Pitfalls
 
 - `focusedIndex` is into `filteredTasks`, not `availableTasks` -> always index `ts.filteredTasks[focusedIndex]`; use task name to cross-reference with `availableTasks`
-- Edit mode rename: `saveWorkspace` must delete old name first; if delete errors, save still proceeds (partial failure possible)
+- Edit mode uses `UpdateWorkspace` (atomic replace by original name), never delete-then-save — a delete-before-save sequence caused a duplicate-name failure on same-name edits
 - Focus index `== elementCount` is valid (submit button); rendering must handle `FocusIndex >= elementCount` explicitly
 - Search mode blocks navigation: always check `IsInSearchMode()` in `WorkspaceModel.Update` before routing key to navigator
 

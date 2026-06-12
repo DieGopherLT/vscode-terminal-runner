@@ -3,6 +3,7 @@ package workspace
 import (
 	"fmt"
 
+	"github.com/DieGopherLT/vscode-terminal-runner/internal/repository"
 	"github.com/DieGopherLT/vscode-terminal-runner/internal/vscode"
 	"github.com/DieGopherLT/vscode-terminal-runner/pkg/styles"
 	"github.com/spf13/cobra"
@@ -51,5 +52,43 @@ var CreateCmd = &cobra.Command{
 		if err := CreateWorkspaceCommand(); err != nil {
 			styles.PrintError(fmt.Sprintf("Failed to create workspace: %v", err))
 		}
+	},
+}
+
+// EditCmd opens the TUI form to edit an existing workspace.
+var EditCmd = &cobra.Command{
+	Use:   "edit <name>",
+	Short: "Edit an existing workspace",
+	Long:  `Edit an existing workspace with the specified name`,
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		workspaceName := args[0]
+
+		if err := EditWorkspaceCommand(workspaceName); err != nil {
+			styles.PrintError(fmt.Sprintf("Failed to edit workspace '%s': %v", workspaceName, err))
+		}
+	},
+}
+
+// DeleteCmd deletes a workspace specified by name.
+var DeleteCmd = &cobra.Command{
+	Use:   "delete <name>",
+	Short: "Delete a workspace",
+	Long:  `Delete a workspace with the specified name`,
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		workspaceName := args[0]
+
+		if _, err := repository.FindWorkspaceByName(workspaceName); err != nil {
+			styles.PrintError(fmt.Sprintf("Workspace '%s' not found", workspaceName))
+			return
+		}
+
+		if err := repository.DeleteWorkspace(workspaceName); err != nil {
+			styles.PrintError(fmt.Sprintf("Failed to delete workspace '%s': %v", workspaceName, err))
+			return
+		}
+
+		styles.PrintSuccess(fmt.Sprintf("Workspace '%s' deleted successfully!", workspaceName))
 	},
 }
