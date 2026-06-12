@@ -12,9 +12,10 @@ import (
 
 // taskCmd represents the project command
 var taskCmd = &cobra.Command{
-	Use:   "task",
-	Short: "TUI to manage projects",
-	Long: `Interactive TUI to manage all tasks operations`,
+	Use:     "task",
+	Aliases: []string{"t"},
+	Short:   "TUI to manage projects",
+	Long:    `Interactive TUI to manage all tasks operations`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Interactive TUI to manage all tasks operations")
 	},
@@ -22,7 +23,7 @@ var taskCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(taskCmd)
-	
+
 	taskCmd.AddCommand(task.CreateCmd)
 	taskCmd.AddCommand(task.ListCmd)
 	taskCmd.AddCommand(task.DeleteCmd)
