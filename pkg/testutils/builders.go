@@ -95,6 +95,12 @@ func (b *WorkspaceBuilder) WithTasks(tasks ...models.Task) *WorkspaceBuilder {
 	return b
 }
 
+// WithNoTasks sets an empty task list (useful for testing the empty-workspace error path).
+func (b *WorkspaceBuilder) WithNoTasks() *WorkspaceBuilder {
+	b.workspace.Tasks = nil
+	return b
+}
+
 // Build returns the constructed models.Workspace.
 func (b *WorkspaceBuilder) Build() models.Workspace {
 	return b.workspace
