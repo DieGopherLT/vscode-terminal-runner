@@ -21,8 +21,8 @@ Handles bridge discovery and authenticated HTTP communication with the VSTR-Brid
 
 ## Key Files
 
-- **vscode_bridge_discovery.go**: `BridgeInfo` struct; all discovery strategies; per-file validation; interactive selection; process-tree detection
-- **vscode_runner.go**: `Runner`; orchestrates discovery + `client.Client` + repository + display
+- **vscode_bridge_discovery.go**: `BridgeInfo` struct; `ProcessNode`/`ProcessInspector` interfaces + production adapters; all discovery strategies; per-file validation; interactive selection; process-tree detection
+- **vscode_runner.go**: `Runner`; `BridgeClient`/`TaskRepository`/`WorkspaceRepository` interfaces; `RunnerDeps`; `NewRunner` (production) + `NewRunnerWithDeps` (test entry point); production adapters; display helpers
 - **security_errors.go**: Error message mapping to user-friendly messages with recovery hints
 
 **Note**: Symbol references use LSP-optimized format (`file::Symbol`) for:
@@ -46,8 +46,8 @@ Handles bridge discovery and authenticated HTTP communication with the VSTR-Brid
 
 **Execution flow:**
 
-1. `DiscoverBridge` -> `NewRunner` creates `client.Client`, loads auth via `LoadAuthFromToken(bridgeInfo.AuthToken)`, runs `TestConnection`
-2. `RunTask(name)` -> `repository.FindTaskByName` -> display info -> `client.ExecuteTask`
+1. `DiscoverBridge` -> `NewRunner` creates `client.Client`, loads auth via `LoadAuthFromToken(bridgeInfo.AuthToken)`, runs `TestConnection`, then delegates to `NewRunnerWithDeps`
+2. `RunTask(name)` -> `TaskRepository.FindByName` (production: wraps `repository.FindTaskByName`) -> display info -> `BridgeClient.ExecuteTask`
 3. Client converts `Task` to a payload map and POSTs to `http://localhost:<port>/task`
 4. Non-200 -> parse error JSON -> `handleBridgeError`
 
@@ -60,14 +60,14 @@ Handles bridge discovery and authenticated HTTP communication with the VSTR-Brid
 **Internal:**
 
 - `internal/models`: `Task`, `Workspace` structs
-- `internal/repository`: `FindTaskByName`, `FindWorkspaceByName`
+- `internal/repository`: `FindTaskByName`, `FindWorkspaceByName` — only reached through `productionTaskRepository`/`productionWorkspaceRepository` adapters; not imported directly in business logic
 - `internal/security`: `AuthManager` — token holding (`LoadTokenFromString`) and auth header generation; `ValidateFilePermissions` (package-level func) and `MinTokenLength` const
-- `internal/client`: `Client` — authenticated HTTP; `taskToPayload` lives here
+- `internal/client`: `Client` — authenticated HTTP; satisfies `BridgeClient` interface; `taskToPayload` lives here
 - `pkg/styles`: `PrintInfo`, `PrintError`, `PrintSuccess`, `RunnerTaskNameStyle`
 
 **External:**
 
-- `github.com/shirou/gopsutil/v3/process`: parent process tree traversal
+- `github.com/shirou/gopsutil/v3/process`: parent process tree traversal — isolated behind `ProcessInspector`/`ProcessNode` interfaces; only touched by `realProcessInspector` and `gopsutilProcessNode`
 - `github.com/samber/lo`: `lo.Find` for bridge matching
 
 **Environment Variables:**
@@ -82,6 +82,12 @@ Handles bridge discovery and authenticated HTTP communication with the VSTR-Brid
 - **BridgeInfo as config carrier**: The JSON file written by the extension carries port, PID, InstanceID, workspace path/name, auth token, and secure flag. `discoverFromEnv`'s fallback synthesizes a `BridgeInfo` from `VSTR`/`VSTR_TOKEN` directly.
 - **Token reuse**: discovery always yields a validated `AuthToken` (from file or `VSTR_TOKEN`), so `NewRunner` authenticates via `LoadAuthFromToken` without re-reading `/tmp`.
 - **Local HTTP only**: no TLS; relies on loopback binding + filesystem permissions + auth token. Acceptable for localhost-only communication.
+- **Testability seams** (all in `package vscode`):
+  - `BridgeClient` interface (`ExecuteTask`, `ExecuteWorkspace`) — inject via `NewRunnerWithDeps(RunnerDeps{Client: fake})`
+  - `TaskRepository` interface (`FindByName`) — inject via `NewRunnerWithDeps(RunnerDeps{Tasks: fake})`
+  - `WorkspaceRepository` interface (`FindByName`) — inject via `NewRunnerWithDeps(RunnerDeps{Workspaces: fake})`
+  - `ProcessInspector`/`ProcessNode` interfaces — call `detectParentVSCode(fakeInspector)` directly in white-box tests (`package vscode`); `discoverFromParentProcess` hardwires `realProcessInspector{}`
+  - `io.Reader` in `selectBridge(bridges, reader)` — call `selectBridge` directly with `strings.NewReader("1\n")`; `discoverFromScan` hardwires `os.Stdin`
 
 ## Modification Guide
 
@@ -138,4 +144,4 @@ This CLAUDE.md is my map for navigating this module. I commit to:
 - **Maintain truth** - outdated documentation is a critical bug
 - **Treat this as my compass** - if this map is wrong, I'm lost
 
-Last verified: 2026-06-04
+Last verified: 2026-06-04 (updated for testability seams)

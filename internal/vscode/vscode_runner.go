@@ -11,12 +11,39 @@ import (
 	"github.com/DieGopherLT/vscode-terminal-runner/pkg/styles"
 )
 
-// Runner orchestrates execution of tasks in VSCode terminals via the authenticated bridge
-type Runner struct {
-	client *client.Client
+// BridgeClient is the interface for sending tasks and workspaces to the VSCode bridge.
+// *client.Client satisfies this interface.
+type BridgeClient interface {
+	ExecuteTask(ctx context.Context, task models.Task) error
+	ExecuteWorkspace(ctx context.Context, workspace models.Workspace) error
 }
 
-// NewRunner creates a new runner instance connected to the VSCode bridge
+// TaskRepository is the interface for looking up a single task by name.
+type TaskRepository interface {
+	FindByName(name string) (*models.Task, error)
+}
+
+// WorkspaceRepository is the interface for looking up a single workspace by name.
+type WorkspaceRepository interface {
+	FindByName(name string) (*models.Workspace, error)
+}
+
+// RunnerDeps groups the injectable dependencies for NewRunnerWithDeps.
+type RunnerDeps struct {
+	Client     BridgeClient
+	Tasks      TaskRepository
+	Workspaces WorkspaceRepository
+}
+
+// Runner orchestrates execution of tasks in VSCode terminals via the authenticated bridge
+type Runner struct {
+	client     BridgeClient
+	tasks      TaskRepository
+	workspaces WorkspaceRepository
+}
+
+// NewRunner creates a new runner instance connected to the VSCode bridge.
+// It discovers the bridge, creates a real client, and wires the production repositories.
 func NewRunner() (*Runner, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -45,7 +72,21 @@ func NewRunner() (*Runner, error) {
 
 	styles.PrintSuccess("Connected to bridge")
 
-	return &Runner{client: bridgeClient}, nil
+	return NewRunnerWithDeps(RunnerDeps{
+		Client:     bridgeClient,
+		Tasks:      productionTaskRepository{},
+		Workspaces: productionWorkspaceRepository{},
+	}), nil
+}
+
+// NewRunnerWithDeps creates a Runner with fully injected dependencies.
+// Use this constructor in tests to supply fakes for any dependency.
+func NewRunnerWithDeps(deps RunnerDeps) *Runner {
+	return &Runner{
+		client:     deps.Client,
+		tasks:      deps.Tasks,
+		workspaces: deps.Workspaces,
+	}
 }
 
 // RunTask executes a single task in a new VSCode terminal
@@ -54,7 +95,7 @@ func (r *Runner) RunTask(taskName string) error {
 	defer cancel()
 
 	// Find the task
-	task, err := repository.FindTaskByName(taskName)
+	task, err := r.tasks.FindByName(taskName)
 	if err != nil {
 		return fmt.Errorf("task not found: %w", err)
 	}
@@ -79,7 +120,7 @@ func (r *Runner) RunWorkspace(workspaceName string) error {
 	defer cancel()
 
 	// Load workspace from repository
-	workspace, err := repository.FindWorkspaceByName(workspaceName)
+	workspace, err := r.workspaces.FindByName(workspaceName)
 	if err != nil {
 		return fmt.Errorf("workspace not found: %w", err)
 	}
@@ -100,6 +141,20 @@ func (r *Runner) RunWorkspace(workspaceName string) error {
 
 	styles.PrintSuccess("All terminals launched successfully")
 	return nil
+}
+
+// productionTaskRepository is the live adapter that delegates to the repository package.
+type productionTaskRepository struct{}
+
+func (productionTaskRepository) FindByName(name string) (*models.Task, error) {
+	return repository.FindTaskByName(name)
+}
+
+// productionWorkspaceRepository is the live adapter that delegates to the repository package.
+type productionWorkspaceRepository struct{}
+
+func (productionWorkspaceRepository) FindByName(name string) (*models.Workspace, error) {
+	return repository.FindWorkspaceByName(name)
 }
 
 // displayTaskInfo shows task details before launching

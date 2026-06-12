@@ -3,6 +3,7 @@ package vscode
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -25,6 +26,49 @@ type BridgeInfo struct {
 	Timestamp     time.Time `json:"timestamp"`
 	AuthToken     string    `json:"auth_token"`
 	Secure        bool      `json:"secure"`
+}
+
+// ProcessNode represents a single OS process in a traversable tree.
+// Tests supply an in-memory fake; production uses gopsutilProcessNode.
+type ProcessNode interface {
+	Name() (string, error)
+	Cmdline() (string, error)
+	Parent() (ProcessNode, error)
+	PID() int32
+}
+
+// ProcessInspector creates a ProcessNode for a given PID and returns the parent PID.
+type ProcessInspector interface {
+	Getppid() int
+	NewProcess(pid int32) (ProcessNode, error)
+}
+
+// gopsutilProcessNode adapts *process.Process to ProcessNode.
+type gopsutilProcessNode struct {
+	proc *process.Process
+}
+
+func (n gopsutilProcessNode) Name() (string, error)    { return n.proc.Name() }
+func (n gopsutilProcessNode) Cmdline() (string, error) { return n.proc.Cmdline() }
+func (n gopsutilProcessNode) PID() int32               { return n.proc.Pid }
+func (n gopsutilProcessNode) Parent() (ProcessNode, error) {
+	parent, err := n.proc.Parent()
+	if err != nil || parent == nil {
+		return nil, err
+	}
+	return gopsutilProcessNode{proc: parent}, nil
+}
+
+// realProcessInspector is the production ProcessInspector backed by the OS.
+type realProcessInspector struct{}
+
+func (realProcessInspector) Getppid() int { return os.Getppid() }
+func (realProcessInspector) NewProcess(pid int32) (ProcessNode, error) {
+	proc, err := process.NewProcess(pid)
+	if err != nil {
+		return nil, err
+	}
+	return gopsutilProcessNode{proc: proc}, nil
 }
 
 // DiscoverBridge finds the correct bridge instance, preferring the most precise
@@ -107,7 +151,7 @@ func enrichWorkspaceMetadata(bridge *BridgeInfo, filePath string) {
 // discoverFromParentProcess walks the process tree to the parent VSCode window and
 // matches a validated bridge by its workspace path.
 func discoverFromParentProcess(bridgeDir string) (*BridgeInfo, error) {
-	instance, err := detectParentVSCode()
+	instance, err := detectParentVSCode(realProcessInspector{})
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +175,7 @@ func discoverFromScan(bridgeDir string) (*BridgeInfo, error) {
 		return &bridges[0], nil
 	}
 
-	return selectBridge(bridges)
+	return selectBridge(bridges, os.Stdin)
 }
 
 // scanValidBridges returns every bridge file that passes security validation. Invalid
@@ -179,8 +223,9 @@ func findValidBridgeByWorkspace(bridgeDir, path string) (*BridgeInfo, error) {
 	return &bridge, nil
 }
 
-// selectBridge presents a selection menu for multiple bridges
-func selectBridge(bridges []BridgeInfo) (*BridgeInfo, error) {
+// selectBridge presents a selection menu for multiple bridges.
+// The input parameter is injected so tests can supply a fake reader instead of os.Stdin.
+func selectBridge(bridges []BridgeInfo, input io.Reader) (*BridgeInfo, error) {
 	styles.PrintInfo("\nMultiple VSCode instances detected")
 	fmt.Println()
 
@@ -195,7 +240,7 @@ func selectBridge(bridges []BridgeInfo) (*BridgeInfo, error) {
 	fmt.Printf("\nSelect instance (1-%d): ", len(bridges))
 
 	var choice int
-	if _, err := fmt.Scanln(&choice); err != nil {
+	if _, err := fmt.Fscanln(input, &choice); err != nil {
 		return nil, fmt.Errorf("invalid input")
 	}
 
@@ -213,15 +258,16 @@ type VSCodeInstance struct {
 	WorkspacePath string
 }
 
-// detectParentVSCode tries to detect if we're running inside a VSCode terminal
-func detectParentVSCode() (*VSCodeInstance, error) {
+// detectParentVSCode tries to detect if we're running inside a VSCode terminal.
+// The inspector parameter is injected so tests can supply a fake process tree.
+func detectParentVSCode(inspector ProcessInspector) (*VSCodeInstance, error) {
 	// Get parent process ID
-	ppid := int32(os.Getppid())
+	ppid := int32(inspector.Getppid())
 
 	// Walk up the process tree (max 10 levels)
 	currentPID := ppid
 	for i := 0; i < 10; i++ {
-		proc, err := process.NewProcess(currentPID)
+		proc, err := inspector.NewProcess(currentPID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get process %d: %w", currentPID, err)
 		}
@@ -241,12 +287,12 @@ func detectParentVSCode() (*VSCodeInstance, error) {
 			}, nil
 		}
 
-		// Get parent process
+		// Get parent process; error or nil means we've reached the top of the tree.
 		parent, err := proc.Parent()
 		if err != nil || parent == nil {
 			break
 		}
-		currentPID = parent.Pid
+		currentPID = parent.PID()
 	}
 
 	return nil, fmt.Errorf("VSCode parent process not found")
