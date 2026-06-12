@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```shell
 # Build
-go build -o vstr
+go build -o bin/vstr
 
 # Run all tests
 go test ./...
@@ -78,6 +78,16 @@ The env path trusts the window-scoped `VSTR_TOKEN` directly (the extension injec
 | -------------------- | ----------------------------------------------------------------------- |
 | `VSTR`               | Port of the active bridge (set automatically by the VSCode extension)   |
 | `VSTR_EXTENSION_NAME`| Override extension ID used during `vstr setup` installation             |
+
+---
+
+## TUI Changes
+
+After any change to a file under `internal/task/`, `internal/workspace/`, or `pkg/tui/`,
+invoke the `tui-integration-tester` agent to run an end-to-end flow through the affected
+form before reporting the task as done. This verifies that navigation, suggestion dropdowns,
+and form submission still work correctly in the actual terminal — type checking alone does
+not catch Bubbletea UX regressions.
 
 ---
 

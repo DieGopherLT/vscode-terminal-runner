@@ -2,45 +2,52 @@
 
 ## Key Architectural Facts
 
-- Both `task run` and `workspace run` exclusively use `SecureRunner` (plain `Runner` exists but is never called by commands).
-- The extension (vscode-extension/src/extension.ts) does NOT implement auth. It has no `auth_token` field in its `BridgeInfo` interface and no `secure` flag. The CLI's secure mode assumes the extension writes these fields but the actual extension does not.
-- The extension writes bridge files with `fs.writeFileSync` using no explicit permissions — files inherit the process umask (typically 0644, world-readable). This is a security gap.
-- The extension's `BridgeInfo` interface omits `auth_token` and `secure` fields that the CLI requires for `SecureRunner`.
-- The extension does NOT set `VSTR` env var in the standard way — it uses `vscode.ExtensionContext.environmentVariableCollection` which only affects terminals opened AFTER the extension activates.
+- Both `task run` and `workspace run` exclusively use `SecureRunner` (plain `Runner` exists but is never called by commands — dead code path).
+- The extension (SecureBridgeServer) DOES implement full auth: writes `auth_token` (64-hex-char, crypto.randomBytes(32)) and `secure: true` to bridge JSON.
+- Bridge files are written with explicit `mode: 0o600` via SecureFileManager.writeBridgeInfo — matches CLI's <= 0700 requirement.
+- The extension sets the `VSTR` env var via `context.environmentVariableCollection.replace('VSTR', port)` — affects new terminals opened after activation.
+- CORS: validateOrigin returns true when `Origin` header is absent (CLI sends no Origin) — CLI requests are allowed through.
 
-## Known Audit Findings
-
-### Critical
-
-- Extension never writes `auth_token` or `secure:true` to bridge JSON — SecureRunner will always fail in production unless a patched extension is in use.
-- Bridge JSON written with no explicit permissions (world-readable by default umask 0644), but CLI requires <= 0700.
-- `BridgeClient.ExecuteWorkspace` reads the response body after it has already been partially read by `handleResponse` path — double-decode bug (body already drained on error path).
+## Known Open Issues (as of 2026-06-04)
 
 ### Warning
 
-- `IsBridgeOperative` and `validateBridge` create a new `http.Client` per call — minor, but unnecessary.
+- `IsBridgeOperative` and `validateBridge` (vscode_bridge_discovery.go) send unauthenticated GET /ping — extension requires auth on ALL non-OPTIONS requests. These helpers return false for any secure bridge, causing `ListAvailableBridges` to delete live bridge files via `os.Remove`. Impact: plain discovery path marks all secure-mode bridges as dead and deletes them. However, both `task run` and `workspace run` use `DiscoverSecureBridge` (not the plain `DiscoverBridge` / `ListAvailableBridges`), so the deletion side-effect is not triggered by normal command usage.
 - `selectBridge` reads from stdin unconditionally — hangs in non-TTY/script contexts.
 - `DiscoverBridge` step 2 (process tree) falls through silently if workspace path doesn't match any bridge file — no warning to user.
-- `ListAvailableBridges` calls `os.Remove` on stale files — side effect during a read operation, may surprise callers.
 - Extension uses `Date.now()` as `instance_id` — two instances started within 1ms would have identical IDs.
+
+### Cosmetic
+
+- `BridgeClient.ExecuteWorkspace` has a double-decode bug (response body already drained on non-200 path before re-decode on success). Plain `Runner` is dead code so this is never triggered in practice.
+
+## Previously Wrong Memory (corrected)
+
+Previous memory claimed: extension has no auth, world-readable files, SecureRunner always fails. All false as of current code.
 
 ## File Locations
 
-- CLI bridge discovery: `/home/diego/Documents/projects/vscode-terminal-runner/cli/internal/vscode/vscode_bridge_discovery.go`
-- CLI bridge client (plain): `/home/diego/Documents/projects/vscode-terminal-runner/cli/internal/vscode/vscode_bridge_client.go`
-- CLI secure runner: `/home/diego/Documents/projects/vscode-terminal-runner/cli/internal/vscode/secure_runner.go`
-- CLI secure client: `/home/diego/Documents/projects/vscode-terminal-runner/cli/internal/client/secure_client.go`
-- CLI auth manager: `/home/diego/Documents/projects/vscode-terminal-runner/cli/internal/security/auth.go`
-- VSCode extension: `/home/diego/Documents/projects/vscode-terminal-runner/vscode-extension/src/extension.ts`
+- CLI bridge discovery: `cli/internal/vscode/vscode_bridge_discovery.go`
+- CLI bridge client (plain): `cli/internal/vscode/vscode_bridge_client.go`
+- CLI secure runner: `cli/internal/vscode/secure_runner.go`
+- CLI secure client: `cli/internal/client/secure_client.go`
+- CLI auth manager: `cli/internal/security/auth.go`
+- Extension entry: `vscode-extension/src/extension.ts`
+- Extension server: `vscode-extension/src/secure-bridge-server.ts`
+- Extension auth: `vscode-extension/src/security/auth-manager/index.ts`
+- Extension file manager: `vscode-extension/src/security/file-manager/index.ts`
+- Extension CORS: `vscode-extension/src/security/cors-manager/index.ts`
+- Extension middleware: `vscode-extension/src/security/security-middleware/index.ts`
 
 ## Protocol Summary
 
-- Endpoints: GET /ping, POST /task, POST /workspace
+- Endpoints: GET /ping, POST /task, POST /workspace, GET /security/status
 - Payload: JSON. Task fields: name, path, cmds[], icon, iconColor. Workspace: name, tasks[].
 - Auth: Bearer token in Authorization header + User-Agent: VSTR-CLI/1.0 (SecureClient only)
-- /ping response: {status, version, workspace, port} — plain; {status, secure, security_features} — secure variant
-- /task response: {success, message} or {success:false, error}
-- /workspace response: {success, results:[{task, success, error?}]} or {success:false, error}
+- /ping response (secure): {status, version, workspace, port, secure:true, security_features:[]}
+- /task response (200): {success:true, message}; error: {success:false, error}
+- /workspace response (200): {success:true, results:[{task, success, error?}]}; error: {success:false, error}
+- Auth token: crypto.randomBytes(32).toString('hex') = 64 hex chars >= 32 byte minimum
 
 ## Timeout Map
 
@@ -53,8 +60,3 @@
 | NewSecureRunner overall context | 30s |
 | SecureRunner.RunTask context | 60s |
 | SecureRunner.RunWorkspace context | 120s |
-
-## Links to Detail Files
-
-- See `ipc-protocol.md` for full protocol documentation
-- See `audit-findings.md` for detailed audit findings with line numbers
