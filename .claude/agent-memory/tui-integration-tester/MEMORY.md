@@ -19,3 +19,7 @@ Each entry links to a dedicated file with problem, solution, root cause, and exa
 ## Screen capture
 
 - [ANSI capture required for selection state](pattern-ansi-for-selection-state.md) — plain capture-pane loses highlights; use -e flag to see which dropdown item is selected
+
+## Workspace form bugs
+
+- [Workspace edit — atomic UpdateWorkspace](pattern-workspace-edit-save-order.md) — delete-before-save superseded; edit now calls UpdateWorkspace for atomic in-place replacement (verified 2026-06-12)
