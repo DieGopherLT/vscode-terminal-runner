@@ -67,7 +67,13 @@ var DeleteCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		taskName := args[0]
-		fmt.Println("Deleting task:", taskName)
+
+		if err := DeleteTask(taskName); err != nil {
+			styles.PrintError(fmt.Sprintf("Failed to delete task '%s': %v", taskName, err))
+			return
+		}
+
+		styles.PrintSuccess(fmt.Sprintf("Task '%s' deleted successfully!", taskName))
 	},
 }
 
