@@ -121,15 +121,15 @@ func (w *WorkspaceModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	if w.nav.FocusIndex == nameField {
+		// Route navigation keys before feeding the input, so a key like Tab or
+		// Enter never reaches nameInput.Update (mirrors the task form ordering).
+		if keyMsg, ok := msg.(tea.KeyMsg); ok && w.isNavigationKey(keyMsg) {
+			return w.handleKeyPress(keyMsg)
+		}
+
 		var cmd tea.Cmd
 		w.nameInput, cmd = w.nameInput.Update(msg)
 		w.clearMessagesOnInput()
-
-		if keyMsg, ok := msg.(tea.KeyMsg); ok {
-			if w.isNavigationKey(keyMsg) {
-				return w.handleKeyPress(keyMsg)
-			}
-		}
 		return w, cmd
 	}
 

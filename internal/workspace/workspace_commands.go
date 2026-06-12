@@ -37,7 +37,7 @@ var ListCmd = &cobra.Command{
 	Long:  `Display a list of all configured workspaces`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// TODO: Implement workspace listing
-		fmt.Println("Workspace listing not yet implemented")
+		styles.PrintInfo("Workspace listing not yet implemented")
 	},
 }
 

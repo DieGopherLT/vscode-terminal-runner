@@ -1,6 +1,10 @@
 package styles
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"strings"
+
+	"github.com/charmbracelet/lipgloss"
+)
 
 // minContainerWidth is the smallest width a bordered container may shrink to
 // before content becomes unreadable on very narrow terminals.
@@ -132,24 +136,18 @@ func RenderTitle(title string) string {
 	return TitleStyle.Render(asciiTitle)
 }
 
-// Helper function to center text within given width
+// centerText centers text within the given display width. Width is measured with
+// lipgloss.Width so multi-byte titles are padded correctly; truncation falls back
+// to rune slicing to avoid cutting a multi-byte character mid-sequence.
 func centerText(text string, width int) string {
-	if len(text) >= width {
-		return text[:width]
+	textWidth := lipgloss.Width(text)
+	if textWidth >= width {
+		return string([]rune(text)[:width])
 	}
 
-	totalPadding := width - len(text)
+	totalPadding := width - textWidth
 	leftPadding := totalPadding / 2
 	rightPadding := totalPadding - leftPadding
 
-	result := ""
-	for i := 0; i < leftPadding; i++ {
-		result += " "
-	}
-	result += text
-	for i := 0; i < rightPadding; i++ {
-		result += " "
-	}
-
-	return result
+	return strings.Repeat(" ", leftPadding) + text + strings.Repeat(" ", rightPadding)
 }
