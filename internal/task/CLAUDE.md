@@ -41,7 +41,7 @@ Bubbletea TUI for task CRUD and execution. Exposes Cobra commands and interactiv
 
 | Index | Field | Notes |
 |-------|-------|-------|
-| 0 | Name | Required; unique key for update |
+| 0 | Name | Required; unique — rejected on create/rename collision |
 | 1 | Path | Optional; `~`, relative, absolute — validated with `os.Stat` after tilde expansion |
 | 2 | Commands | Required; comma-separated, split on save |
 | 3 | Icon | Must match `styles.VSCodeIcons`; autocomplete via `IconSuggestions` |
@@ -49,7 +49,7 @@ Bubbletea TUI for task CRUD and execution. Exposes Cobra commands and interactiv
 
 Index `5` is the Submit button (navigation wraps 0..5).
 
-**Submission flow:** Enter on Submit -> `handleTaskCreation` -> `isValidTask` (in-memory checks only, errors to `MessageManager`) -> if valid, `submitTaskCmd` runs async: `validateTaskPath` (`os.Stat`) -> `saveTask` -> `taskSaveResultMsg` -> `tea.Quit`.
+**Submission flow:** Enter on Submit -> `handleTaskCreation` -> `isValidTask` (in-memory checks only, errors to `MessageManager`) -> if valid, `submitTaskCmd` runs async: `validateTaskPath` (`os.Stat`) -> reject name collision for create/rename via `FindByName` (case-insensitive; same-name edits exempt) -> `saveTask` -> `taskSaveResultMsg` -> `tea.Quit`.
 
 **Suggestion lifecycle:** typing updates filter; Ctrl+N/Ctrl+B cycles; Tab/Enter applies. Navigation resets manager. `getCurrentSuggestionManager` routes by `FocusIndex`.
 
@@ -105,7 +105,7 @@ Strict Bubbletea MUV pattern. `TaskModel` holds all state: `[]textinput.Model`, 
 - Tilde path not expanded before `os.Stat` -> validation always fails for `~` paths. Use `expandPathForValidation` first.
 - Edit mode: always use `originalTaskName` as key in `UpdateTask`, not the current form value, or rename silently creates a duplicate.
 - Suggestion + Tab collision: Tab checks and applies suggestion first, then navigates only if no suggestion was applied. Don't change this order.
-- Name uniqueness on rename: `UpdateTask` replaces by `originalTaskName`; there is no uniqueness check, so renaming to an existing task overwrites it silently.
+- Name uniqueness: `submitTaskCmd` rejects a brand-new name or a rename onto an existing task via `FindByName` (case-insensitive), and `repository.SaveTask` is a case-sensitive backstop (its injected `onAppend` strategy). Same-name edits are exempt. `UpdateTask` itself still replaces by `originalTaskName` and does not cross-check, so the form guard is what prevents a rename from overwriting another task.
 
 ## Usage Examples
 

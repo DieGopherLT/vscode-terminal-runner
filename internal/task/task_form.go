@@ -1,6 +1,8 @@
 package task
 
 import (
+	"fmt"
+
 	"github.com/DieGopherLT/vscode-terminal-runner/internal/models"
 	"github.com/DieGopherLT/vscode-terminal-runner/pkg/styles"
 	"github.com/DieGopherLT/vscode-terminal-runner/pkg/tui"
@@ -137,12 +139,26 @@ func (t *TaskModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return t, cmd
 }
 
-// submitTaskCmd performs path validation and persistence off the UI goroutine.
+// submitTaskCmd performs path validation, a name-collision check, and persistence
+// off the UI goroutine.
 func submitTaskCmd(t *TaskModel, task models.Task) tea.Cmd {
+	isEditMode := t.isEditMode
+	originalName := t.originalTaskName
+
 	return func() tea.Msg {
 		if err := validateTaskPath(task.Path, t.expandPathForValidation); err != nil {
 			return taskSaveResultMsg{err: err}
 		}
+
+		// Reject collisions: a brand-new task, or a rename onto an existing name.
+		// A same-name edit keeps its own slot and is exempt from this check.
+		isClaimingNewName := !isEditMode || task.Name != originalName
+		if isClaimingNewName {
+			if _, err := FindByName(task.Name); err == nil {
+				return taskSaveResultMsg{err: fmt.Errorf("task '%s' already exists", task.Name)}
+			}
+		}
+
 		if err := t.saveTask(task); err != nil {
 			return taskSaveResultMsg{err: err}
 		}

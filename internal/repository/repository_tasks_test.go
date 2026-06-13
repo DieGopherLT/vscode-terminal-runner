@@ -297,25 +297,30 @@ func TestDeleteTask_returnsErrorOnCorruptJSON(t *testing.T) {
 	}
 }
 
-func TestSaveTask_appendsWithoutDeduplication(t *testing.T) {
+func TestSaveTask_rejectsDuplicateName(t *testing.T) {
 	defer redirectTasksSaveFile(t)()
 
-	// SaveTask has no duplicate guard (unlike SaveWorkspace). Pin this asymmetry.
+	// The task name is the unique handle every read path keys on, so SaveTask
+	// rejects a second task with the same name (mirrors SaveWorkspace).
 	task := testutils.NewTask().WithName("duplicated").Build()
 	if err := SaveTask(task); err != nil {
 		t.Fatalf("first SaveTask returned unexpected error: %v", err)
 	}
-	if err := SaveTask(task); err != nil {
-		t.Fatalf("second SaveTask returned unexpected error: %v", err)
+
+	err := SaveTask(task)
+	if err == nil {
+		t.Fatal("second SaveTask with the same name should have returned an error")
+	}
+	if !strings.Contains(err.Error(), "already exists") {
+		t.Fatalf("expected 'already exists' in error, got: %v", err)
 	}
 
 	tasks, err := ReadTasks()
 	if err != nil {
 		t.Fatalf("ReadTasks returned unexpected error: %v", err)
 	}
-	// Characterization: duplicate is accepted. Two entries with the same name exist.
-	if len(tasks) != 2 {
-		t.Fatalf("expected 2 tasks (SaveTask has no dedup guard), got %d", len(tasks))
+	if len(tasks) != 1 {
+		t.Fatalf("expected the duplicate to be rejected (1 task), got %d", len(tasks))
 	}
 }
 

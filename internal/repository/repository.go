@@ -34,13 +34,20 @@ type JSONRepository[T NamedEntity] struct {
 }
 
 // NewTaskRepository builds the task repository: tasks are keyed under "tasks"
-// and appended unconditionally (duplicates are allowed by design).
+// and rejected on a case-sensitive name collision, since the task name is the
+// handle every read path (find, run, completion, workspace selector) keys on.
 func NewTaskRepository(getSaveFile func() string) *JSONRepository[models.Task] {
 	return &JSONRepository[models.Task]{
 		getSaveFile: getSaveFile,
 		jsonKey:     "tasks",
 		entityLabel: "task",
 		onAppend: func(existing []models.Task, task models.Task) ([]models.Task, error) {
+			_, found := lo.Find(existing, func(candidate models.Task) bool {
+				return candidate.Name == task.Name
+			})
+			if found {
+				return nil, fmt.Errorf("task '%s' already exists", task.Name)
+			}
 			return append(existing, task), nil
 		},
 	}
