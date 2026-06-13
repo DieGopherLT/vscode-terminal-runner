@@ -1,12 +1,10 @@
 package repository
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/DieGopherLT/vscode-terminal-runner/internal/models"
-	"github.com/samber/lo"
 )
 
 var (
@@ -33,15 +31,7 @@ func NewWorkspaceRepository(getSaveFile func() string) *JSONRepository[models.Wo
 		getSaveFile: getSaveFile,
 		jsonKey:     "workspaces",
 		entityLabel: "workspace",
-		onAppend: func(existing []models.Workspace, workspace models.Workspace) ([]models.Workspace, error) {
-			_, found := lo.Find(existing, func(candidate models.Workspace) bool {
-				return candidate.Name == workspace.Name
-			})
-			if found {
-				return nil, fmt.Errorf("workspace '%s' already exists", workspace.Name)
-			}
-			return append(existing, workspace), nil
-		},
+		onAppend:    rejectDuplicateName[models.Workspace]("workspace"),
 	}
 }
 

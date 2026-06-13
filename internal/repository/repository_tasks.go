@@ -1,12 +1,10 @@
 package repository
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/DieGopherLT/vscode-terminal-runner/internal/models"
-	"github.com/samber/lo"
 )
 
 var (
@@ -34,15 +32,7 @@ func NewTaskRepository(getSaveFile func() string) *JSONRepository[models.Task] {
 		getSaveFile: getSaveFile,
 		jsonKey:     "tasks",
 		entityLabel: "task",
-		onAppend: func(existing []models.Task, task models.Task) ([]models.Task, error) {
-			_, found := lo.Find(existing, func(candidate models.Task) bool {
-				return candidate.Name == task.Name
-			})
-			if found {
-				return nil, fmt.Errorf("task '%s' already exists", task.Name)
-			}
-			return append(existing, task), nil
-		},
+		onAppend:    rejectDuplicateName[models.Task]("task"),
 	}
 }
 

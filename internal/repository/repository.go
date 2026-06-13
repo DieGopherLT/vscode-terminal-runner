@@ -18,9 +18,9 @@ type NamedEntity interface {
 }
 
 // JSONRepository persists a slice of T as a single JSON object file whose only
-// top-level key is jsonKey, e.g. {"tasks": [...]}. The per-type append rule is
-// injected via onAppend (Strategy), keeping the generic core free of any
-// type-specific uniqueness logic.
+// top-level key is jsonKey, e.g. {"tasks": [...]}. The append rule is injected
+// via onAppend (Strategy) so each repository can choose its own policy; both
+// current repositories use the shared rejectDuplicateName strategy.
 //
 // The save-file path is resolved lazily through getSaveFile rather than captured
 // at construction time, so callers (notably tests) that reassign the package
@@ -30,6 +30,21 @@ type JSONRepository[T NamedEntity] struct {
 	jsonKey     string
 	entityLabel string
 	onAppend    func(existing []T, item T) ([]T, error)
+}
+
+// rejectDuplicateName builds an onAppend strategy that refuses to append an item
+// whose name already exists, compared case-sensitively. entityLabel names the
+// kind of item for the error message, e.g. "task" or "workspace".
+func rejectDuplicateName[T NamedEntity](entityLabel string) func([]T, T) ([]T, error) {
+	return func(existing []T, item T) ([]T, error) {
+		_, found := lo.Find(existing, func(candidate T) bool {
+			return candidate.GetName() == item.GetName()
+		})
+		if found {
+			return nil, fmt.Errorf("%s '%s' already exists", entityLabel, item.GetName())
+		}
+		return append(existing, item), nil
+	}
 }
 
 // ReadAll loads every persisted item, creating the backing file on first use.
