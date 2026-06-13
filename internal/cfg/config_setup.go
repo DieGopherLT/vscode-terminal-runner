@@ -38,7 +38,7 @@ func Setup() error {
 	time.Sleep(1500 * time.Millisecond)
 
 	// Check if extension is already installed
-	if isExtensionInstalled() {
+	if IsExtensionInstalled() {
 		styles.PrintSuccess("VSTR-Bridge extension is already installed!")
 		return completeSetup()
 	}
@@ -149,8 +149,8 @@ func completeSetup() error {
 	return nil
 }
 
-// isExtensionInstalled checks if the VSCode extension is already installed.
-func isExtensionInstalled() bool {
+// IsExtensionInstalled checks if the VSCode extension is already installed.
+func IsExtensionInstalled() bool {
 	cmd := exec.Command("code", "--list-extensions")
 	output, err := cmd.Output()
 	if err != nil {
