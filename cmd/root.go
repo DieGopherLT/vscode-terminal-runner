@@ -1,10 +1,8 @@
-/*
-Copyright © 2025 NAME HERE <EMAIL ADDRESS>
-*/
 package cmd
 
 import (
 	"os"
+	"runtime/debug"
 
 	"github.com/DieGopherLT/vscode-terminal-runner/internal/cfg"
 	"github.com/spf13/cobra"
@@ -12,8 +10,9 @@ import (
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "vstr",
-	Short: "VSCode Terminal Runner - Automate your development workflow",
+	Use:     "vstr",
+	Version: resolveVersion(),
+	Short:   "VSCode Terminal Runner - Automate your development workflow",
 	Long: `VSCode Terminal Runner is a powerful CLI tool that eliminates the pain of 
 manually setting up your development environment. With configurable tasks and 
 workspaces, you can launch all your project terminals and commands through VSCode.
@@ -45,4 +44,16 @@ func Execute() {
 
 func init() {
 	rootCmd.AddCommand(cfg.SetupCMD)
+}
+
+func resolveVersion() string {
+	info, ok := debug.ReadBuildInfo()
+	return resolveVersionFrom(info, ok)
+}
+
+func resolveVersionFrom(info *debug.BuildInfo, ok bool) string {
+	if !ok || info.Main.Version == "" || info.Main.Version == "(devel)" {
+		return "dev"
+	}
+	return info.Main.Version
 }
