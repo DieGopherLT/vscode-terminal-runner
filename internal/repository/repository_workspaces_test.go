@@ -113,10 +113,10 @@ func TestFindWorkspaceByName_returnsWorkspaceOnMatch(t *testing.T) {
 			wantErr:   false,
 		},
 		{
-			name:      "case-insensitive match (EqualFold) returns workspace",
+			name:      "different-case name does not match (case-sensitive)",
 			savedName: "My-Project",
 			queryName: "my-project",
-			wantErr:   false,
+			wantErr:   true,
 		},
 		{
 			name:      "missing name returns error",

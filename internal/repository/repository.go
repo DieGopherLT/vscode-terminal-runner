@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/samber/lo"
 )
@@ -57,7 +56,9 @@ func (r *JSONRepository[T]) ReadAll() ([]T, error) {
 	return content[r.jsonKey], nil
 }
 
-// FindByName retrieves the item whose name matches name, case-insensitively.
+// FindByName retrieves the item whose name matches name. The comparison is
+// case-sensitive, matching the uniqueness rule enforced by onAppend on write,
+// so a lookup never resolves a name the repository would treat as distinct.
 func (r *JSONRepository[T]) FindByName(name string) (*T, error) {
 	items, err := r.ReadAll()
 	if err != nil {
@@ -65,7 +66,7 @@ func (r *JSONRepository[T]) FindByName(name string) (*T, error) {
 	}
 
 	item, found := lo.Find(items, func(item T) bool {
-		return strings.EqualFold(item.GetName(), name)
+		return item.GetName() == name
 	})
 	if !found {
 		return nil, fmt.Errorf("%s '%s' not found", r.entityLabel, name)

@@ -132,10 +132,10 @@ func TestFindTaskByName_returnsTaskOnMatch(t *testing.T) {
 			wantErr:   false,
 		},
 		{
-			name:      "case-insensitive match (EqualFold) returns task",
+			name:      "different-case name does not match (case-sensitive)",
 			savedName: "Build",
 			queryName: "build",
-			wantErr:   false,
+			wantErr:   true,
 		},
 		{
 			name:      "missing name returns error",
