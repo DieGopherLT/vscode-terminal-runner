@@ -164,19 +164,49 @@ func (r *JSONRepository[T]) Delete(name string) error {
 	return r.WriteAll(remaining)
 }
 
-// WriteAll replaces the whole file with items, serialized as {jsonKey: items}.
+// WriteAll atomically replaces the whole file with items, serialized as
+// {jsonKey: items}. It writes to a temporary file in the same directory and
+// renames it over the destination: os.Rename is atomic within a filesystem, so
+// a crash mid-write can never leave a truncated or corrupt JSON file behind.
 func (r *JSONRepository[T]) WriteAll(items []T) error {
 	if err := r.ensure(); err != nil {
 		return err
 	}
 
+	saveFile := r.getSaveFile()
 	content := map[string][]T{r.jsonKey: items}
 	encoded, err := json.Marshal(content)
 	if err != nil {
-		return err
+		return fmt.Errorf("WriteAll: marshal %s: %w", r.jsonKey, err)
 	}
 
-	return os.WriteFile(r.getSaveFile(), encoded, 0666)
+	dir := filepath.Dir(saveFile)
+	tmp, err := os.CreateTemp(dir, filepath.Base(saveFile)+".tmp-*")
+	if err != nil {
+		return fmt.Errorf("WriteAll: create temp file in %q: %w", dir, err)
+	}
+	// Best-effort cleanup: harmless once the rename has consumed the temp file.
+	tmpName := tmp.Name()
+	defer os.Remove(tmpName)
+
+	if _, err := tmp.Write(encoded); err != nil {
+		tmp.Close()
+		return fmt.Errorf("WriteAll: write temp file %q: %w", tmpName, err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("WriteAll: close temp file %q: %w", tmpName, err)
+	}
+
+	// CreateTemp yields 0600; restore the 0666 the plain write used so the
+	// stored permissions stay unchanged by this atomicity refactor.
+	if err := os.Chmod(tmpName, 0666); err != nil {
+		return fmt.Errorf("WriteAll: chmod temp file %q: %w", tmpName, err)
+	}
+
+	if err := os.Rename(tmpName, saveFile); err != nil {
+		return fmt.Errorf("WriteAll: rename %q to %q: %w", tmpName, saveFile, err)
+	}
+	return nil
 }
 
 // ensure creates the config directory and an empty save file if either is
