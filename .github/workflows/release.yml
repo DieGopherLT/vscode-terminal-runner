@@ -33,7 +33,8 @@ jobs:
 
       - name: Extract release notes
         run: |
-          awk '/^## \['"${GITHUB_REF_NAME}"'\]/{found=1; next} found && /^## \[/{exit} found{print}' CHANGELOG.md > release-notes.md
+          VERSION="${GITHUB_REF_NAME#v}"
+          awk '/^## \['"${VERSION}"'\]/{found=1; next} found && /^## \[/{exit} found{print}' CHANGELOG.md > release-notes.md
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
