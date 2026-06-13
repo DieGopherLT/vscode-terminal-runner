@@ -9,7 +9,7 @@ type Task struct {
 	IconColor string   `json:"iconColor"` // Icon color in the terminal
 }
 
-// GetName returns the task's unique name, satisfying the repository's NamedEntity constraint.
+// GetName returns the name that uniquely identifies this task.
 func (t Task) GetName() string {
 	return t.Name
 }
@@ -20,7 +20,7 @@ type Workspace struct {
 	Tasks []Task `json:"tasks"`
 }
 
-// GetName returns the workspace's unique name, satisfying the repository's NamedEntity constraint.
+// GetName returns the name that uniquely identifies this workspace.
 func (w Workspace) GetName() string {
 	return w.Name
 }

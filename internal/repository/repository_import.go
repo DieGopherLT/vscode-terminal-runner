@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/DieGopherLT/vscode-terminal-runner/internal/models"
+	"github.com/DieGopherLT/vscode-terminal-runner/pkg/collections"
 	"github.com/DieGopherLT/vscode-terminal-runner/pkg/styles"
 	"github.com/samber/lo"
 )
@@ -101,18 +102,18 @@ func ImportWorkspaces(workspaces []models.Workspace) error {
 // collectTaskBatchErrors validates each task against existing disk state and intra-batch
 // duplicates. Returns every problem found; the caller decides whether to abort.
 func collectTaskBatchErrors(tasks []models.Task, existing []models.Task) []error {
-	existingNames := make(map[string]bool, len(existing))
+	existingNames := collections.NewSet[string]()
 	for _, t := range existing {
-		existingNames[t.Name] = true
+		existingNames.Add(t.Name)
 	}
 
 	var errs []error
-	seenInBatch := make(map[string]bool, len(tasks))
+	seenInBatch := collections.NewSet[string]()
 
 	for i, task := range tasks {
 		errs = append(errs, validateSingleTask(i, task, existingNames, seenInBatch)...)
 		if task.Name != "" {
-			seenInBatch[task.Name] = true
+			seenInBatch.Add(task.Name)
 		}
 	}
 
@@ -122,18 +123,18 @@ func collectTaskBatchErrors(tasks []models.Task, existing []models.Task) []error
 // collectWorkspaceBatchErrors validates each workspace against existing disk state and
 // intra-batch duplicates. Returns every problem found.
 func collectWorkspaceBatchErrors(workspaces []models.Workspace, existing []models.Workspace) []error {
-	existingNames := make(map[string]bool, len(existing))
+	existingNames := collections.NewSet[string]()
 	for _, ws := range existing {
-		existingNames[ws.Name] = true
+		existingNames.Add(ws.Name)
 	}
 
 	var errs []error
-	seenInBatch := make(map[string]bool, len(workspaces))
+	seenInBatch := collections.NewSet[string]()
 
 	for i, ws := range workspaces {
 		errs = append(errs, validateSingleWorkspace(i, ws, existingNames, seenInBatch)...)
 		if ws.Name != "" {
-			seenInBatch[ws.Name] = true
+			seenInBatch.Add(ws.Name)
 		}
 	}
 
@@ -141,7 +142,7 @@ func collectWorkspaceBatchErrors(workspaces []models.Workspace, existing []model
 }
 
 // validateSingleTask collects all validation errors for one task entry.
-func validateSingleTask(idx int, task models.Task, existingNames map[string]bool, seenInBatch map[string]bool) []error {
+func validateSingleTask(idx int, task models.Task, existingNames *collections.Set[string], seenInBatch *collections.Set[string]) []error {
 	var errs []error
 
 	label := fmt.Sprintf("entry %d", idx)
@@ -152,10 +153,10 @@ func validateSingleTask(idx int, task models.Task, existingNames map[string]bool
 	if task.Name == "" {
 		errs = append(errs, fmt.Errorf("entry %d: name is required", idx))
 	} else {
-		if existingNames[task.Name] {
+		if existingNames.Contains(task.Name) {
 			errs = append(errs, fmt.Errorf("task %q: already exists on disk", task.Name))
 		}
-		if seenInBatch[task.Name] {
+		if seenInBatch.Contains(task.Name) {
 			errs = append(errs, fmt.Errorf("task %q: duplicate name in batch", task.Name))
 		}
 	}
@@ -186,17 +187,17 @@ func validateSingleTask(idx int, task models.Task, existingNames map[string]bool
 }
 
 // validateSingleWorkspace collects all validation errors for one workspace entry.
-func validateSingleWorkspace(idx int, ws models.Workspace, existingNames map[string]bool, seenInBatch map[string]bool) []error {
+func validateSingleWorkspace(idx int, ws models.Workspace, existingNames *collections.Set[string], seenInBatch *collections.Set[string]) []error {
 	if ws.Name == "" {
 		return []error{fmt.Errorf("entry %d: workspace name is required", idx)}
 	}
 
 	var errs []error
 
-	if existingNames[ws.Name] {
+	if existingNames.Contains(ws.Name) {
 		errs = append(errs, fmt.Errorf("workspace %q: already exists on disk", ws.Name))
 	}
-	if seenInBatch[ws.Name] {
+	if seenInBatch.Contains(ws.Name) {
 		errs = append(errs, fmt.Errorf("workspace %q: duplicate name in batch", ws.Name))
 	}
 
