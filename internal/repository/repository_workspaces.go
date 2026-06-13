@@ -71,38 +71,3 @@ func UpdateWorkspace(originalName string, updatedWorkspace models.Workspace) err
 func DeleteWorkspace(name string) error {
 	return workspaceRepo.Delete(name)
 }
-
-// appendWorkspaceIfUnique returns a new slice with workspace appended, or an error when
-// a workspace with the same name already exists. Pure: no I/O.
-func appendWorkspaceIfUnique(workspaces []models.Workspace, workspace models.Workspace) ([]models.Workspace, error) {
-	if _, found := lo.Find(workspaces, func(ws models.Workspace) bool {
-		return ws.Name == workspace.Name
-	}); found {
-		return nil, fmt.Errorf("workspace '%s' already exists", workspace.Name)
-	}
-	return append(workspaces, workspace), nil
-}
-
-// filterOutWorkspaceByName returns a copy of workspaces without the entry whose Name
-// equals name. Pure: no I/O.
-func filterOutWorkspaceByName(workspaces []models.Workspace, name string) []models.Workspace {
-	return lo.Filter(workspaces, func(ws models.Workspace, _ int) bool {
-		return ws.Name != name
-	})
-}
-
-// replaceWorkspaceByName returns a copy of workspaces with the entry matching originalName
-// replaced by updatedWorkspace. Returns an error when the name is not found. Pure: no I/O.
-func replaceWorkspaceByName(workspaces []models.Workspace, originalName string, updatedWorkspace models.Workspace) ([]models.Workspace, error) {
-	_, index, found := lo.FindIndexOf(workspaces, func(ws models.Workspace) bool {
-		return ws.Name == originalName
-	})
-	if !found {
-		return nil, fmt.Errorf("workspace '%s' not found", originalName)
-	}
-
-	result := make([]models.Workspace, len(workspaces))
-	copy(result, workspaces)
-	result[index] = updatedWorkspace
-	return result, nil
-}

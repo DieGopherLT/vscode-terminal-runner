@@ -94,54 +94,6 @@ func TestDeleteTask_removesExistingTask(t *testing.T) {
 	}
 }
 
-// -- pure-transform unit tests: no filesystem required --
-
-func TestAppendTask_addsToSlice(t *testing.T) {
-	initial := []models.Task{{Name: "a"}}
-	result := appendTask(initial, models.Task{Name: "b"})
-	if len(result) != 2 {
-		t.Fatalf("expected 2 tasks, got %d", len(result))
-	}
-	if result[1].Name != "b" {
-		t.Fatalf("expected appended task name %q, got %q", "b", result[1].Name)
-	}
-}
-
-func TestReplaceTaskByName_replacesCorrectEntry(t *testing.T) {
-	tasks := []models.Task{{Name: "old"}, {Name: "keep"}}
-	updated := models.Task{Name: "new"}
-
-	result, err := replaceTaskByName(tasks, "old", updated)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if result[0].Name != "new" {
-		t.Fatalf("expected first task to be renamed to %q, got %q", "new", result[0].Name)
-	}
-	if result[1].Name != "keep" {
-		t.Fatalf("expected second task to remain %q, got %q", "keep", result[1].Name)
-	}
-}
-
-func TestReplaceTaskByName_returnsErrorForMissingName(t *testing.T) {
-	tasks := []models.Task{{Name: "alpha"}}
-	_, err := replaceTaskByName(tasks, "nonexistent", models.Task{})
-	if err == nil {
-		t.Fatal("expected an error for a missing task name")
-	}
-}
-
-func TestFilterOutTaskByName_removesMatchingEntry(t *testing.T) {
-	tasks := []models.Task{{Name: "remove-me"}, {Name: "keep-me"}}
-	result := filterOutTaskByName(tasks, "remove-me")
-	if len(result) != 1 {
-		t.Fatalf("expected 1 task after filter, got %d", len(result))
-	}
-	if result[0].Name != "keep-me" {
-		t.Fatalf("expected remaining task %q, got %q", "keep-me", result[0].Name)
-	}
-}
-
 // -- additional characterization tests for uncovered functions --
 
 func TestReadTasks_returnsAllSavedTasks(t *testing.T) {
@@ -321,30 +273,6 @@ func TestSaveTask_rejectsDuplicateName(t *testing.T) {
 	}
 	if len(tasks) != 1 {
 		t.Fatalf("expected the duplicate to be rejected (1 task), got %d", len(tasks))
-	}
-}
-
-// -- pure-transform edge cases --
-
-func TestAppendTask_onNilSliceCreatesNewSlice(t *testing.T) {
-	result := appendTask(nil, models.Task{Name: "first"})
-	if len(result) != 1 {
-		t.Fatalf("expected 1 task from nil base, got %d", len(result))
-	}
-}
-
-func TestFilterOutTaskByName_onNonMatchingNameReturnsAll(t *testing.T) {
-	tasks := []models.Task{{Name: "a"}, {Name: "b"}}
-	result := filterOutTaskByName(tasks, "nonexistent")
-	if len(result) != 2 {
-		t.Fatalf("expected 2 tasks when filter name does not match, got %d", len(result))
-	}
-}
-
-func TestFilterOutTaskByName_onEmptySliceReturnsEmpty(t *testing.T) {
-	result := filterOutTaskByName(nil, "any")
-	if len(result) != 0 {
-		t.Fatalf("expected 0 tasks for nil input, got %d", len(result))
 	}
 }
 

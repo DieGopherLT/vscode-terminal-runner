@@ -97,43 +97,6 @@ func TestDeleteWorkspace_removesExistingWorkspace(t *testing.T) {
 	}
 }
 
-// -- pure-transform unit tests: no filesystem required --
-
-func TestAppendWorkspaceIfUnique_addsWhenNameAbsent(t *testing.T) {
-	initial := []models.Workspace{{Name: "alpha"}}
-	ws := models.Workspace{Name: "beta"}
-
-	result, err := appendWorkspaceIfUnique(initial, ws)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(result) != 2 {
-		t.Fatalf("expected 2 workspaces, got %d", len(result))
-	}
-	if result[1].Name != "beta" {
-		t.Fatalf("expected appended workspace name %q, got %q", "beta", result[1].Name)
-	}
-}
-
-func TestAppendWorkspaceIfUnique_returnsErrorForDuplicateName(t *testing.T) {
-	initial := []models.Workspace{{Name: "alpha"}}
-	_, err := appendWorkspaceIfUnique(initial, models.Workspace{Name: "alpha"})
-	if err == nil {
-		t.Fatal("expected an error when workspace name already exists")
-	}
-}
-
-func TestFilterOutWorkspaceByName_removesMatchingEntry(t *testing.T) {
-	workspaces := []models.Workspace{{Name: "remove-me"}, {Name: "keep-me"}}
-	result := filterOutWorkspaceByName(workspaces, "remove-me")
-	if len(result) != 1 {
-		t.Fatalf("expected 1 workspace after filter, got %d", len(result))
-	}
-	if result[0].Name != "keep-me" {
-		t.Fatalf("expected remaining workspace %q, got %q", "keep-me", result[0].Name)
-	}
-}
-
 // -- additional characterization tests for uncovered functions --
 
 func TestFindWorkspaceByName_returnsWorkspaceOnMatch(t *testing.T) {
@@ -264,34 +227,6 @@ func TestSaveWorkspace_returnsErrorOnCorruptJSON(t *testing.T) {
 	}
 }
 
-// -- pure-transform edge cases --
-
-func TestAppendWorkspaceIfUnique_onEmptySliceAddsWorkspace(t *testing.T) {
-	ws := testutils.NewWorkspace().WithName("first").Build()
-	result, err := appendWorkspaceIfUnique(nil, ws)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(result) != 1 {
-		t.Fatalf("expected 1 workspace from nil base, got %d", len(result))
-	}
-}
-
-func TestFilterOutWorkspaceByName_onNonMatchingNameReturnsAll(t *testing.T) {
-	workspaces := []models.Workspace{{Name: "a"}, {Name: "b"}}
-	result := filterOutWorkspaceByName(workspaces, "nonexistent")
-	if len(result) != 2 {
-		t.Fatalf("expected 2 workspaces when filter name does not match, got %d", len(result))
-	}
-}
-
-func TestFilterOutWorkspaceByName_onEmptySliceReturnsEmpty(t *testing.T) {
-	result := filterOutWorkspaceByName(nil, "any")
-	if len(result) != 0 {
-		t.Fatalf("expected 0 workspaces for nil input, got %d", len(result))
-	}
-}
-
 func TestUpdateWorkspace_successfullyReplacesWorkspace(t *testing.T) {
 	defer redirectWorkspacesSaveFile(t)()
 
@@ -340,30 +275,6 @@ func TestUpdateWorkspace_returnsErrorOnCorruptJSON(t *testing.T) {
 	err := UpdateWorkspace("any", models.Workspace{Name: "any"})
 	if err == nil {
 		t.Fatal("UpdateWorkspace should return an error when workspaces.json contains corrupt JSON")
-	}
-}
-
-func TestReplaceWorkspaceByName_replacesCorrectEntry(t *testing.T) {
-	workspaces := []models.Workspace{{Name: "old"}, {Name: "keep"}}
-	updated := models.Workspace{Name: "new"}
-
-	result, err := replaceWorkspaceByName(workspaces, "old", updated)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if result[0].Name != "new" {
-		t.Fatalf("expected first workspace to be renamed to %q, got %q", "new", result[0].Name)
-	}
-	if result[1].Name != "keep" {
-		t.Fatalf("expected second workspace to remain %q, got %q", "keep", result[1].Name)
-	}
-}
-
-func TestReplaceWorkspaceByName_returnsErrorForMissingName(t *testing.T) {
-	workspaces := []models.Workspace{{Name: "alpha"}}
-	_, err := replaceWorkspaceByName(workspaces, "nonexistent", models.Workspace{})
-	if err == nil {
-		t.Fatal("expected an error for a missing workspace name")
 	}
 }
 
