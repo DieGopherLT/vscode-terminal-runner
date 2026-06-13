@@ -69,6 +69,11 @@ var DeleteCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		taskName := args[0]
 
+		if _, err := repository.FindTaskByName(taskName); err != nil {
+			styles.PrintError(fmt.Sprintf("Task '%s' not found", taskName))
+			return
+		}
+
 		if err := DeleteTask(taskName); err != nil {
 			styles.PrintError(fmt.Sprintf("Failed to delete task '%s': %v", taskName, err))
 			return
