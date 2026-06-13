@@ -1,9 +1,7 @@
 package workspace
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 
 	"github.com/DieGopherLT/vscode-terminal-runner/internal/models"
@@ -55,22 +53,9 @@ var CreateCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		source, _ := cmd.Flags().GetString("from-json")
 		if source != "" {
-			reader, err := repository.OpenSource(source)
-			if err != nil {
-				styles.PrintError(fmt.Sprintf("Failed to open source: %v", err))
-				os.Exit(1)
-			}
-			defer reader.Close()
-
-			data, err := io.ReadAll(reader)
+			workspaces, err := repository.ReadJSONSource[[]models.Workspace](source)
 			if err != nil {
 				styles.PrintError(fmt.Sprintf("Failed to read source: %v", err))
-				os.Exit(1)
-			}
-
-			var workspaces []models.Workspace
-			if err := json.Unmarshal(data, &workspaces); err != nil {
-				styles.PrintError(fmt.Sprintf("Invalid JSON: %v", err))
 				os.Exit(1)
 			}
 

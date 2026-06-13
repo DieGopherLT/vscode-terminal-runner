@@ -25,6 +25,30 @@ func OpenSource(source string) (io.ReadCloser, error) {
 	return f, nil
 }
 
+// ReadJSONSource opens source via OpenSource, reads all bytes, and unmarshals them into T.
+// It consolidates the open-read-unmarshal sequence shared by all --from-json command handlers.
+func ReadJSONSource[T any](source string) (T, error) {
+	var zero T
+
+	reader, err := OpenSource(source)
+	if err != nil {
+		return zero, err
+	}
+	defer reader.Close()
+
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return zero, fmt.Errorf("ReadJSONSource: %w", err)
+	}
+
+	var result T
+	if err := json.Unmarshal(data, &result); err != nil {
+		return zero, fmt.Errorf("ReadJSONSource: invalid JSON: %w", err)
+	}
+
+	return result, nil
+}
+
 // ValidateTaskBatch checks the batch for all problems (VAL-001, VAL-003, VAL-004, VAL-005)
 // without modifying any file. Returns nil when all entries are valid.
 func ValidateTaskBatch(tasks []models.Task) error {
@@ -121,17 +145,10 @@ func collectWorkspaceBatchErrors(workspaces []models.Workspace, existing []model
 	seenInBatch := make(map[string]bool, len(workspaces))
 
 	for i, ws := range workspaces {
-		if ws.Name == "" {
-			errs = append(errs, fmt.Errorf("entry %d: workspace name is required", i))
-			continue
+		errs = append(errs, validateSingleWorkspace(i, ws, existingNames, seenInBatch)...)
+		if ws.Name != "" {
+			seenInBatch[ws.Name] = true
 		}
-		if existingNames[ws.Name] {
-			errs = append(errs, fmt.Errorf("workspace %q: already exists on disk", ws.Name))
-		}
-		if seenInBatch[ws.Name] {
-			errs = append(errs, fmt.Errorf("workspace %q: duplicate name in batch", ws.Name))
-		}
-		seenInBatch[ws.Name] = true
 	}
 
 	return errs
@@ -141,11 +158,9 @@ func collectWorkspaceBatchErrors(workspaces []models.Workspace, existing []model
 func validateSingleTask(idx int, task models.Task, existingNames map[string]bool, seenInBatch map[string]bool) []error {
 	var errs []error
 
-	entryLabel := func() string {
-		if task.Name != "" {
-			return fmt.Sprintf("task %q", task.Name)
-		}
-		return fmt.Sprintf("entry %d", idx)
+	label := fmt.Sprintf("entry %d", idx)
+	if task.Name != "" {
+		label = fmt.Sprintf("task %q", task.Name)
 	}
 
 	if task.Name == "" {
@@ -160,7 +175,7 @@ func validateSingleTask(idx int, task models.Task, existingNames map[string]bool
 	}
 
 	if len(task.Cmds) == 0 {
-		errs = append(errs, fmt.Errorf("%s: cmds must not be empty", entryLabel()))
+		errs = append(errs, fmt.Errorf("%s: cmds must not be empty", label))
 	}
 
 	if task.Icon != "" {
@@ -168,7 +183,7 @@ func validateSingleTask(idx int, task models.Task, existingNames map[string]bool
 			return i.Name == task.Icon
 		})
 		if !validIcon {
-			errs = append(errs, fmt.Errorf("%s: icon %q is not a valid VSCode icon", entryLabel(), task.Icon))
+			errs = append(errs, fmt.Errorf("%s: icon %q is not a valid VSCode icon", label, task.Icon))
 		}
 	}
 
@@ -177,8 +192,26 @@ func validateSingleTask(idx int, task models.Task, existingNames map[string]bool
 			return c.Name == task.IconColor
 		})
 		if !validColor {
-			errs = append(errs, fmt.Errorf("%s: iconColor %q is not a valid VSCode ANSI color", entryLabel(), task.IconColor))
+			errs = append(errs, fmt.Errorf("%s: iconColor %q is not a valid VSCode ANSI color", label, task.IconColor))
 		}
+	}
+
+	return errs
+}
+
+// validateSingleWorkspace collects all validation errors for one workspace entry.
+func validateSingleWorkspace(idx int, ws models.Workspace, existingNames map[string]bool, seenInBatch map[string]bool) []error {
+	var errs []error
+
+	if ws.Name == "" {
+		return append(errs, fmt.Errorf("entry %d: workspace name is required", idx))
+	}
+
+	if existingNames[ws.Name] {
+		errs = append(errs, fmt.Errorf("workspace %q: already exists on disk", ws.Name))
+	}
+	if seenInBatch[ws.Name] {
+		errs = append(errs, fmt.Errorf("workspace %q: duplicate name in batch", ws.Name))
 	}
 
 	return errs

@@ -1,9 +1,7 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 
 	"github.com/DieGopherLT/vscode-terminal-runner/internal/models"
@@ -24,22 +22,9 @@ var importCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		source, _ := cmd.Flags().GetString("from-json")
 
-		reader, err := repository.OpenSource(source)
-		if err != nil {
-			styles.PrintError(fmt.Sprintf("Failed to open source: %v", err))
-			os.Exit(1)
-		}
-		defer reader.Close()
-
-		data, err := io.ReadAll(reader)
+		payload, err := repository.ReadJSONSource[unifiedImportPayload](source)
 		if err != nil {
 			styles.PrintError(fmt.Sprintf("Failed to read source: %v", err))
-			os.Exit(1)
-		}
-
-		var payload unifiedImportPayload
-		if err := json.Unmarshal(data, &payload); err != nil {
-			styles.PrintError(fmt.Sprintf("Invalid JSON: %v", err))
 			os.Exit(1)
 		}
 

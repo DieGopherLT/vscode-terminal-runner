@@ -1,9 +1,7 @@
 package task
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 
 	"github.com/DieGopherLT/vscode-terminal-runner/internal/models"
@@ -22,22 +20,9 @@ var CreateCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		source, _ := cmd.Flags().GetString("from-json")
 		if source != "" {
-			reader, err := repository.OpenSource(source)
-			if err != nil {
-				styles.PrintError(fmt.Sprintf("Failed to open source: %v", err))
-				os.Exit(1)
-			}
-			defer reader.Close()
-
-			data, err := io.ReadAll(reader)
+			tasks, err := repository.ReadJSONSource[[]models.Task](source)
 			if err != nil {
 				styles.PrintError(fmt.Sprintf("Failed to read source: %v", err))
-				os.Exit(1)
-			}
-
-			var tasks []models.Task
-			if err := json.Unmarshal(data, &tasks); err != nil {
-				styles.PrintError(fmt.Sprintf("Invalid JSON: %v", err))
 				os.Exit(1)
 			}
 
