@@ -201,11 +201,11 @@ func validateSingleTask(idx int, task models.Task, existingNames map[string]bool
 
 // validateSingleWorkspace collects all validation errors for one workspace entry.
 func validateSingleWorkspace(idx int, ws models.Workspace, existingNames map[string]bool, seenInBatch map[string]bool) []error {
-	var errs []error
-
 	if ws.Name == "" {
-		return append(errs, fmt.Errorf("entry %d: workspace name is required", idx))
+		return []error{fmt.Errorf("entry %d: workspace name is required", idx)}
 	}
+
+	var errs []error
 
 	if existingNames[ws.Name] {
 		errs = append(errs, fmt.Errorf("workspace %q: already exists on disk", ws.Name))
