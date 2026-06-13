@@ -48,8 +48,8 @@ func gatherStatus() statusCheckResult {
 		return result
 	}
 
-	c := client.NewClient(bridge.Port)
-	if err := c.LoadAuthFromToken(bridge.AuthToken); err != nil {
+	bridgeClient := client.NewClient(bridge.Port)
+	if err := bridgeClient.LoadAuthFromToken(bridge.AuthToken); err != nil {
 		result.bridgeErr = fmt.Errorf("failed to load auth token: %w", err)
 		return result
 	}
@@ -57,7 +57,7 @@ func gatherStatus() statusCheckResult {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	if err := c.TestConnection(ctx); err != nil {
+	if err := bridgeClient.TestConnection(ctx); err != nil {
 		result.bridgeErr = err
 		return result
 	}
@@ -70,21 +70,21 @@ func gatherStatus() statusCheckResult {
 func renderStatus(result statusCheckResult) bool {
 	styles.PrintInfo("VSTR status")
 
-	allOK := true
+	allChecksPass := true
 
 	if result.extensionInstalled {
 		styles.PrintSuccess("Extension 'diegopherlt.vstr-bridge' installed")
 	} else {
 		styles.PrintError("Extension 'diegopherlt.vstr-bridge' not installed (run 'vstr setup')")
-		allOK = false
+		allChecksPass = false
 	}
 
 	if result.bridgeErr == nil {
 		styles.PrintSuccess(fmt.Sprintf("Bridge connection (port %d, workspace %q)", result.bridgePort, result.bridgeWorkspace))
 	} else {
 		styles.PrintError(fmt.Sprintf("Bridge connection: %s", result.bridgeErr))
-		allOK = false
+		allChecksPass = false
 	}
 
-	return allOK
+	return allChecksPass
 }
