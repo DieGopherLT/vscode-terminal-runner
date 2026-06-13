@@ -9,10 +9,20 @@ type Task struct {
 	IconColor string   `json:"iconColor"` // Icon color in the terminal
 }
 
+// GetName returns the task's unique name, satisfying the repository's NamedEntity constraint.
+func (t Task) GetName() string {
+	return t.Name
+}
+
 // Workspace represents a workspace containing multiple tasks.
 type Workspace struct {
 	Name  string `json:"name"`
 	Tasks []Task `json:"tasks"`
+}
+
+// GetName returns the workspace's unique name, satisfying the repository's NamedEntity constraint.
+func (w Workspace) GetName() string {
+	return w.Name
 }
 
 // Config represents the configuration for the terminal runner.
