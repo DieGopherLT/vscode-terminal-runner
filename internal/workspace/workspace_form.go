@@ -430,7 +430,7 @@ func (w *WorkspaceModel) renderHelpText() string {
 
 // getAvailableTasks retrieves all available tasks with proper error handling.
 func getAvailableTasks() ([]models.Task, error) {
-	availableTasks, err := repository.GetAllTasks()
+	availableTasks, err := repository.ReadTasks()
 	if err != nil {
 		return nil, fmt.Errorf("getAvailableTasks: %w", err)
 	}

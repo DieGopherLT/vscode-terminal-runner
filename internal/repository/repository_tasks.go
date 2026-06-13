@@ -26,13 +26,28 @@ func init() {
 	taskRepo = NewTaskRepository(func() string { return TasksSaveFile })
 }
 
-// ReadTasks loads all tasks from the persistence file.
-func ReadTasks() ([]models.Task, error) {
-	return taskRepo.ReadAll()
+// NewTaskRepository builds the task repository: tasks are keyed under "tasks"
+// and rejected on a case-sensitive name collision, since the task name is the
+// handle every read path (find, run, completion, workspace selector) keys on.
+func NewTaskRepository(getSaveFile func() string) *JSONRepository[models.Task] {
+	return &JSONRepository[models.Task]{
+		getSaveFile: getSaveFile,
+		jsonKey:     "tasks",
+		entityLabel: "task",
+		onAppend: func(existing []models.Task, task models.Task) ([]models.Task, error) {
+			_, found := lo.Find(existing, func(candidate models.Task) bool {
+				return candidate.Name == task.Name
+			})
+			if found {
+				return nil, fmt.Errorf("task '%s' already exists", task.Name)
+			}
+			return append(existing, task), nil
+		},
+	}
 }
 
-// GetAllTasks retrieves all saved tasks.
-func GetAllTasks() ([]models.Task, error) {
+// ReadTasks loads all tasks from the persistence file.
+func ReadTasks() ([]models.Task, error) {
 	return taskRepo.ReadAll()
 }
 

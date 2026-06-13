@@ -144,7 +144,7 @@ func TestFilterOutTaskByName_removesMatchingEntry(t *testing.T) {
 
 // -- additional characterization tests for uncovered functions --
 
-func TestGetAllTasks_returnsAllSavedTasks(t *testing.T) {
+func TestReadTasks_returnsAllSavedTasks(t *testing.T) {
 	defer redirectTasksSaveFile(t)()
 
 	task1 := testutils.NewTask().WithName("first").Build()
@@ -157,12 +157,12 @@ func TestGetAllTasks_returnsAllSavedTasks(t *testing.T) {
 		t.Fatalf("SaveTask(second) returned unexpected error: %v", err)
 	}
 
-	all, err := GetAllTasks()
+	all, err := ReadTasks()
 	if err != nil {
-		t.Fatalf("GetAllTasks returned unexpected error: %v", err)
+		t.Fatalf("ReadTasks returned unexpected error: %v", err)
 	}
 	if len(all) != 2 {
-		t.Fatalf("expected 2 tasks from GetAllTasks, got %d", len(all))
+		t.Fatalf("expected 2 tasks from ReadTasks, got %d", len(all))
 	}
 }
 

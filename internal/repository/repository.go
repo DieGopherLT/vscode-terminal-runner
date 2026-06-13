@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/DieGopherLT/vscode-terminal-runner/internal/models"
 	"github.com/samber/lo"
 )
 
@@ -32,45 +31,6 @@ type JSONRepository[T NamedEntity] struct {
 	jsonKey     string
 	entityLabel string
 	onAppend    func(existing []T, item T) ([]T, error)
-}
-
-// NewTaskRepository builds the task repository: tasks are keyed under "tasks"
-// and rejected on a case-sensitive name collision, since the task name is the
-// handle every read path (find, run, completion, workspace selector) keys on.
-func NewTaskRepository(getSaveFile func() string) *JSONRepository[models.Task] {
-	return &JSONRepository[models.Task]{
-		getSaveFile: getSaveFile,
-		jsonKey:     "tasks",
-		entityLabel: "task",
-		onAppend: func(existing []models.Task, task models.Task) ([]models.Task, error) {
-			_, found := lo.Find(existing, func(candidate models.Task) bool {
-				return candidate.Name == task.Name
-			})
-			if found {
-				return nil, fmt.Errorf("task '%s' already exists", task.Name)
-			}
-			return append(existing, task), nil
-		},
-	}
-}
-
-// NewWorkspaceRepository builds the workspace repository: workspaces are keyed
-// under "workspaces" and rejected on a case-sensitive name collision.
-func NewWorkspaceRepository(getSaveFile func() string) *JSONRepository[models.Workspace] {
-	return &JSONRepository[models.Workspace]{
-		getSaveFile: getSaveFile,
-		jsonKey:     "workspaces",
-		entityLabel: "workspace",
-		onAppend: func(existing []models.Workspace, workspace models.Workspace) ([]models.Workspace, error) {
-			_, found := lo.Find(existing, func(candidate models.Workspace) bool {
-				return candidate.Name == workspace.Name
-			})
-			if found {
-				return nil, fmt.Errorf("workspace '%s' already exists", workspace.Name)
-			}
-			return append(existing, workspace), nil
-		},
-	}
 }
 
 // ReadAll loads every persisted item, creating the backing file on first use.

@@ -71,7 +71,7 @@ Bubbletea TUI for workspace CRUD and execution. A workspace is a named group of 
 **Internal:**
 
 - `internal/models`: `Task`, `Workspace` structs
-- `internal/repository`: `GetAllTasks`, `FindWorkspaceByName`, `SaveWorkspace`, `UpdateWorkspace`, `DeleteWorkspace`
+- `internal/repository`: `ReadTasks`, `FindWorkspaceByName`, `SaveWorkspace`, `UpdateWorkspace`, `DeleteWorkspace`
 - `internal/vscode`: `NewSecureRunner` -> `RunWorkspace` for execution
 - `pkg/tui`: `FormNavigator` for field focus cycling
 - `pkg/messages`: `MessageManager` — `AddError`, `AddWarning`, `AddSuccess`, `Render`

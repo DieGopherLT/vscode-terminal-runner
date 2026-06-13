@@ -26,6 +26,25 @@ func init() {
 	workspaceRepo = NewWorkspaceRepository(func() string { return WorkspacesSaveFile })
 }
 
+// NewWorkspaceRepository builds the workspace repository: workspaces are keyed
+// under "workspaces" and rejected on a case-sensitive name collision.
+func NewWorkspaceRepository(getSaveFile func() string) *JSONRepository[models.Workspace] {
+	return &JSONRepository[models.Workspace]{
+		getSaveFile: getSaveFile,
+		jsonKey:     "workspaces",
+		entityLabel: "workspace",
+		onAppend: func(existing []models.Workspace, workspace models.Workspace) ([]models.Workspace, error) {
+			_, found := lo.Find(existing, func(candidate models.Workspace) bool {
+				return candidate.Name == workspace.Name
+			})
+			if found {
+				return nil, fmt.Errorf("workspace '%s' already exists", workspace.Name)
+			}
+			return append(existing, workspace), nil
+		},
+	}
+}
+
 // ReadWorkspaces loads all workspaces from the persistence file.
 func ReadWorkspaces() ([]models.Workspace, error) {
 	return workspaceRepo.ReadAll()
