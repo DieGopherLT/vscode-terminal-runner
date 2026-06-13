@@ -4,11 +4,10 @@
 
 [![Go Version](https://img.shields.io/badge/Go-1.24.5-00ADD8?style=flat-square&logo=go)](https://golang.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](LICENSE)
-[![Work in Progress](https://img.shields.io/badge/status-WIP-orange.svg?style=flat-square)]()
 
 ## What is VSCode Terminal Runner?
 
-VSCode Terminal Runner is a powerful CLI tool that **eliminates the pain** of manually setting up your development environment. With configurable tasks and workspaces, you can launch all your project terminals and commands through VSCode.
+VSCode Terminal Runner is a CLI tool that **eliminates the pain** of manually setting up your development environment. With configurable tasks and workspaces, you can launch all your project terminals and commands through VSCode.
 
 Perfect for developers working with **microservices**, **full-stack applications**, or any **multi-project setup**.
 
@@ -31,7 +30,9 @@ cd api-gateway && go run main.go
 **After VSCode Terminal Runner:**
 
 ```bash
-vstr workspace run my-project  # Everything launches automatically in VSCode
+vstr workspace run my-project
+# Under the hood, vstr creates every terminal and runs every command
+# in the same order they were configured in your workspace.
 ```
 
 ## What VSCode Terminal Runner Solves
@@ -40,144 +41,6 @@ vstr workspace run my-project  # Everything launches automatically in VSCode
 - Repetitive daily commands -> One-command project launch
 - Forgetting service dependencies -> Configured execution order
 - Context switching overhead -> Instant development environment
-
-## Quick Demo
-
-```bash
-# 1. Install VSTR-Bridge VSCode Extension
-# Visit: https://github.com/DieGopherLT/VSTR-Bridge
-
-# 2. Install VSCode Terminal Runner CLI
-go install github.com/DieGopherLT/vscode-terminal-runner@latest
-
-# 3. Create a task
-vstr task create
-
-# 4. Create a workspace with multiple tasks
-vstr workspace create
-
-# 5. Launch workspace in VSCode
-vstr workspace run my-fullstack-app
-```
-
-## Technology Stack
-
-**Built with Modern Go:**
-
-- **[Cobra](https://cobra.dev/)** - Powerful CLI framework with auto-completion
-- **[Bubbletea](https://github.com/charmbracelet/bubbletea)** - Elegant TUI components
-- **[Lipgloss](https://github.com/charmbracelet/lipgloss)** - Beautiful styling
-- **[samber/lo](https://github.com/samber/lo)** - Functional programming utilities
-- **[gopsutil](https://github.com/shirou/gopsutil)** - Cross-platform process detection
-
-## Project Structure
-
-**This repository contains the CLI component. The VSCode extension is in a separate repository: [VSTR-Bridge](https://github.com/DieGopherLT/VSTR-Bridge)**
-
-```
-vscode-terminal-runner/ (CLI Component)
-├── cmd/                    # CLI commands and entry points
-├── internal/
-│   ├── models/            # Data structures
-│   ├── repository/        # Data persistence
-│   ├── launcher/          # VSCode integration
-│   └── tui/               # Terminal UI components
-├── pkg/                   # Reusable packages
-├── docs/                  # Documentation
-└── main.go               # Application entry point
-```
-
-## Getting Started
-
-### Installation
-
-```bash
-# Install from source
-go install github.com/DieGopherLT/vscode-terminal-runner@latest
-
-# Or download binary from releases
-curl -L https://github.com/DieGopherLT/vscode-terminal-runner/releases/latest/download/vstr-linux-amd64 -o vstr
-chmod +x vstr && sudo mv vstr /usr/local/bin/
-```
-
-### Prerequisites
-
-**VSCode Extension Required:**
-
-This CLI requires the **VSTR-Bridge** VSCode extension to function properly. The extension handles the communication between the CLI and VSCode terminals.
-
-**Install the extension:**
-
-- Repository: [VSTR-Bridge Extension](https://github.com/DieGopherLT/VSTR-Bridge)
-- **Future enhancement:** A `vstr setup` command will be available to automatically install the extension with user consent
-
-### Quick Setup
-
-1. **Create your first task:**
-
-   ```bash
-   vstr task create
-   ```
-
-2. **Create a workspace:**
-
-   ```bash
-   vstr workspace create
-   ```
-
-3. **Run a task:**
-
-   ```bash
-   vstr task run my-task
-   ```
-
-4. **Run a workspace:**
-
-   ```bash
-   vstr workspace run my-workspace
-   ```
-
-### Available Commands
-
-#### Task Management
-
-```bash
-vstr task create           # Interactive form to create a new task
-vstr task list            # List all tasks
-vstr task list --only-names  # List task names only
-vstr task edit <name>     # Edit an existing task
-vstr task run <name>      # Run a specific task
-vstr task delete <name>   # Delete a task
-```
-
-#### Workspace Management
-
-```bash
-vstr workspace create     # Interactive form to create a new workspace
-vstr workspace list      # List all workspaces
-vstr workspace run <name> # Run all tasks in a workspace
-```
-
-## Use Cases
-
-- **Full-stack Development**: Launch frontend, backend, and database simultaneously
-- **Microservices Architecture**: Start all services in correct dependency order
-- **Testing Environments**: Set up complex test scenarios with multiple components
-- **DevOps Workflows**: Automate local development environment setup
-
-## Status
-
-This project is currently **work in progress** and is developed as a personal tool. It is open source under the MIT License, but is not actively seeking external contributors at this time.
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-**Made by DieGopherLT**
-
----
 
 ## VSCode Integration
 
@@ -196,6 +59,83 @@ This tool is specifically designed to integrate with VSCode through the **VSTR-B
 - Commands execute in the context of your VSCode workspace
 - No manual terminal switching required
 
-### Future Enhancements
+## Installation
 
-A `vstr setup` command is planned to automatically install and configure the VSTR-Bridge extension with user consent, making the initial setup even simpler.
+### Prerequisites
+
+- [Go 1.24+](https://go.dev/dl/) must be installed on your system.
+
+```sh
+curl -sSL https://raw.githubusercontent.com/DieGopherLT/vscode-terminal-runner/main/install.sh | sh
+```
+
+Then run `vstr setup` to install the required VSCode extension ([VSTR-Bridge](https://github.com/DieGopherLT/VSTR-Bridge)) directly from GitHub Releases.
+
+### Quick Setup
+
+A **task** is the unit of execution: it runs one or more commands inside a dedicated VSCode terminal. A **workspace** groups several tasks together and launches each one in its own terminal, in the order you defined.
+
+1. **Create your first task:**
+
+   ```bash
+   vstr task create   # or: vstr t create
+   ```
+
+2. **Create a workspace:**
+
+   ```bash
+   vstr workspace create   # or: vstr w create
+   ```
+
+3. **Run a task:**
+
+   ```bash
+   vstr task run my-task   # or: vstr t run my-task
+   ```
+
+4. **Run a workspace:**
+
+   ```bash
+   vstr workspace run my-workspace   # or: vstr w run my-workspace
+   ```
+
+### Available Commands
+
+#### Task Management
+
+```bash
+vstr task create           # Interactive form to create a new task
+vstr task list             # List all tasks
+vstr task list --only-names  # List task names only
+vstr task edit <name>      # Edit an existing task
+vstr task run <name>       # Run a specific task
+vstr task delete <name>    # Delete a task
+```
+
+#### Workspace Management
+
+```bash
+vstr workspace create      # Interactive form to create a new workspace
+vstr workspace list        # List all workspaces
+vstr workspace edit <name> # Edit an existing workspace
+vstr workspace run <name>  # Run all tasks in a workspace
+vstr workspace delete <name> # Delete a workspace
+```
+
+> `task` and `workspace` have short aliases: `t` and `w` respectively.
+> For example: `vstr t run my-task` or `vstr w run my-project`.
+
+## Use Cases
+
+- **Full-stack Development**: Launch frontend, backend, and database simultaneously
+- **Microservices Architecture**: Start all services in correct dependency order
+- **Testing Environments**: Set up complex test scenarios with multiple components
+- **DevOps Workflows**: Automate local development environment setup
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+**Made by DieGopherLT**

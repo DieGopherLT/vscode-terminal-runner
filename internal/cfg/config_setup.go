@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"strings"
@@ -159,32 +161,91 @@ func isExtensionInstalled() bool {
 	return strings.Contains(strings.ToLower(installedExtensions), "diegopherlt.vstr-bridge")
 }
 
-// installExtension handles the interactive installation of the VSCode extension.
+// installExtension downloads the latest VSIX from GitHub Releases and installs it.
 func installExtension() error {
+	styles.PrintProgress("Fetching latest VSTR-Bridge release...")
+
+	vsixPath, err := downloadLatestExtension()
+	if err != nil {
+		return fmt.Errorf("downloading extension: %w", err)
+	}
+	defer os.Remove(vsixPath)
+
 	styles.PrintProgress("Installing VSTR-Bridge extension...")
 
-	extensionName := os.Getenv("VSTR_EXTENSION_NAME")
-	if extensionName == "" {
-		extensionName = "DieGopherLT.vstr-bridge"
-	}
-	cmd := exec.Command("code", "--install-extension", extensionName)
+	cmd := exec.Command("code", "--install-extension", vsixPath)
 	output, err := cmd.CombinedOutput()
-
 	if err != nil {
 		return fmt.Errorf("installation failed: %w\nOutput: %s", err, string(output))
 	}
 
-	outputStr := string(output)
-	if strings.Contains(outputStr, "successfully installed") || strings.Contains(outputStr, "already installed") {
-		styles.PrintSuccess("Extension installed successfully!")
-		styles.PrintInfo("Please restart VSCode to activate the extension.")
-		return nil
+	styles.PrintSuccess("Extension installed successfully!")
+	styles.PrintInfo("Please restart VSCode to activate the extension.")
+	return nil
+}
+
+type githubRelease struct {
+	Assets []releaseAsset `json:"assets"`
+}
+
+type releaseAsset struct {
+	Name               string `json:"name"`
+	BrowserDownloadURL string `json:"browser_download_url"`
+}
+
+func downloadLatestExtension() (string, error) {
+	req, err := http.NewRequest(http.MethodGet, "https://api.github.com/repos/DieGopherLT/VSTR-Bridge/releases/latest", nil)
+	if err != nil {
+		return "", fmt.Errorf("building request: %w", err)
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("User-Agent", "vstr-cli")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("fetching release info: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
 	}
 
-	// If we get here, the command succeeded but with unexpected output
-	styles.PrintInfo("Extension installation completed. Output:")
-	styles.PrintInfo(outputStr)
-	return nil
+	var release githubRelease
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return "", fmt.Errorf("decoding release: %w", err)
+	}
+
+	var asset *releaseAsset
+	for i := range release.Assets {
+		if strings.HasSuffix(release.Assets[i].Name, ".vsix") {
+			asset = &release.Assets[i]
+			break
+		}
+	}
+	if asset == nil {
+		return "", fmt.Errorf("no .vsix asset found in latest release")
+	}
+
+	downloadResp, err := http.Get(asset.BrowserDownloadURL)
+	if err != nil {
+		return "", fmt.Errorf("downloading %s: %w", asset.Name, err)
+	}
+	defer downloadResp.Body.Close()
+
+	tmpFile, err := os.CreateTemp("", "vstr-bridge-*.vsix")
+	if err != nil {
+		return "", fmt.Errorf("creating temp file: %w", err)
+	}
+
+	if _, err := io.Copy(tmpFile, downloadResp.Body); err != nil {
+		tmpFile.Close()
+		os.Remove(tmpFile.Name())
+		return "", fmt.Errorf("writing extension file: %w", err)
+	}
+	tmpFile.Close()
+
+	return tmpFile.Name(), nil
 }
 
 // getInstallationChoice prompts the user for installation choice with better UX.
