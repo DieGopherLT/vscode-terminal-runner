@@ -145,19 +145,17 @@ func collectWorkspaceBatchErrors(workspaces []models.Workspace, existing []model
 func validateSingleTask(idx int, task models.Task, existingNames *collections.Set[string], seenInBatch *collections.Set[string]) []error {
 	var errs []error
 
+	// label identifies the entry in every message: by name once known, by index otherwise.
 	label := fmt.Sprintf("entry %d", idx)
-	if task.Name != "" {
-		label = fmt.Sprintf("task %q", task.Name)
-	}
-
 	if task.Name == "" {
-		errs = append(errs, fmt.Errorf("entry %d: name is required", idx))
+		errs = append(errs, fmt.Errorf("%s: name is required", label))
 	} else {
+		label = fmt.Sprintf("task %q", task.Name)
 		if existingNames.Contains(task.Name) {
-			errs = append(errs, fmt.Errorf("task %q: already exists on disk", task.Name))
+			errs = append(errs, fmt.Errorf("%s: already exists on disk", label))
 		}
 		if seenInBatch.Contains(task.Name) {
-			errs = append(errs, fmt.Errorf("task %q: duplicate name in batch", task.Name))
+			errs = append(errs, fmt.Errorf("%s: duplicate name in batch", label))
 		}
 	}
 

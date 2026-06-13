@@ -146,12 +146,16 @@ func (r *JSONRepository[T]) WriteAll(items []T) error {
 	if err != nil {
 		return fmt.Errorf("WriteAll: create temp file in %q: %w", dir, err)
 	}
-	// Best-effort cleanup: harmless once the rename has consumed the temp file.
 	tmpName := tmp.Name()
-	defer os.Remove(tmpName)
+	// Close and remove are no-ops once the file is already closed or has been
+	// renamed away; they guarantee no descriptor or temp file leaks on any exit,
+	// including a panic.
+	defer func() {
+		tmp.Close()
+		os.Remove(tmpName)
+	}()
 
 	if _, err := tmp.Write(encoded); err != nil {
-		tmp.Close()
 		return fmt.Errorf("WriteAll: write temp file %q: %w", tmpName, err)
 	}
 	if err := tmp.Close(); err != nil {
