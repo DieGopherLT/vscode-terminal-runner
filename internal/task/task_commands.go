@@ -1,9 +1,12 @@
 package task
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 
+	"github.com/DieGopherLT/vscode-terminal-runner/internal/models"
 	"github.com/DieGopherLT/vscode-terminal-runner/internal/repository"
 	"github.com/DieGopherLT/vscode-terminal-runner/internal/vscode"
 	"github.com/DieGopherLT/vscode-terminal-runner/pkg/styles"
@@ -11,22 +14,39 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// CreateCmd starts the TUI form to create a new task.
+// CreateCmd starts the TUI form to create a new task, or imports tasks from JSON when --from-json is set.
 var CreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a new task",
 	Long:  `Create a new task with the specified configuration`,
 	Run: func(cmd *cobra.Command, args []string) {
-
-		batchPath, _ := cmd.Flags().GetString("file")
-		if batchPath != "" {
-			err := repository.SaveFromFile(batchPath)
+		source, _ := cmd.Flags().GetString("from-json")
+		if source != "" {
+			reader, err := repository.OpenSource(source)
 			if err != nil {
-				styles.PrintError(fmt.Sprintf("Failed to create tasks from file: %v", err))
+				styles.PrintError(fmt.Sprintf("Failed to open source: %v", err))
 				os.Exit(1)
 			}
-			styles.PrintSuccess("Tasks created successfully from file!")
+			defer reader.Close()
 
+			data, err := io.ReadAll(reader)
+			if err != nil {
+				styles.PrintError(fmt.Sprintf("Failed to read source: %v", err))
+				os.Exit(1)
+			}
+
+			var tasks []models.Task
+			if err := json.Unmarshal(data, &tasks); err != nil {
+				styles.PrintError(fmt.Sprintf("Invalid JSON: %v", err))
+				os.Exit(1)
+			}
+
+			if err := repository.ImportTasks(tasks); err != nil {
+				styles.PrintError(fmt.Sprintf("Import failed:\n%v", err))
+				os.Exit(1)
+			}
+
+			styles.PrintSuccess(fmt.Sprintf("%d task(s) imported successfully!", len(tasks)))
 			os.Exit(0)
 		}
 
@@ -134,23 +154,5 @@ var RunCmd = &cobra.Command{
 
 func init() {
 	ListCmd.Flags().BoolP("only-names", "n", false, "List only task names")
-
-	fileHelpText := "Creates tasks from a JSON file\n\n" +
-		"Example JSON format:\n" +
-		"[\n" +
-		"  {\n" +
-		"    \"name\": \"Build Project\",\n" +
-		"    \"icon\": \"tools\",\n" +
-		"    \"iconColor\": \"terminal.ansiBlue\",\n" +
-		"    \"cmds\": [\"npm run build\", \"echo Build completed\"]\n" +
-		"  },\n" +
-		"  {\n" +
-		"    \"name\": \"Run Tests\",\n" +
-		"    \"icon\": \"beaker\",\n" +
-		"    \"iconColor\": \"terminal.ansiGreen\",\n" +
-		"    \"cmds\": [\"npm test\"]\n" +
-		"  }\n" +
-		"]"
-
-	CreateCmd.Flags().StringP("file", "f", "", fileHelpText)
+	CreateCmd.Flags().StringP("from-json", "j", "", "Import tasks from a JSON file or stdin (-)")
 }

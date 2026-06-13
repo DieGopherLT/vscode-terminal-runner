@@ -1,8 +1,12 @@
 package workspace
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
+	"os"
 
+	"github.com/DieGopherLT/vscode-terminal-runner/internal/models"
 	"github.com/DieGopherLT/vscode-terminal-runner/internal/repository"
 	"github.com/DieGopherLT/vscode-terminal-runner/internal/vscode"
 	"github.com/DieGopherLT/vscode-terminal-runner/pkg/styles"
@@ -43,12 +47,42 @@ var ListCmd = &cobra.Command{
 	},
 }
 
-// createWorkspaceCmd creates a new workspace
+// createWorkspaceCmd creates a new workspace, or imports workspaces from JSON when --from-json is set.
 var CreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a new workspace",
 	Long:  `Create a new workspace with selected tasks`,
 	Run: func(cmd *cobra.Command, args []string) {
+		source, _ := cmd.Flags().GetString("from-json")
+		if source != "" {
+			reader, err := repository.OpenSource(source)
+			if err != nil {
+				styles.PrintError(fmt.Sprintf("Failed to open source: %v", err))
+				os.Exit(1)
+			}
+			defer reader.Close()
+
+			data, err := io.ReadAll(reader)
+			if err != nil {
+				styles.PrintError(fmt.Sprintf("Failed to read source: %v", err))
+				os.Exit(1)
+			}
+
+			var workspaces []models.Workspace
+			if err := json.Unmarshal(data, &workspaces); err != nil {
+				styles.PrintError(fmt.Sprintf("Invalid JSON: %v", err))
+				os.Exit(1)
+			}
+
+			if err := repository.ImportWorkspaces(workspaces); err != nil {
+				styles.PrintError(fmt.Sprintf("Import failed:\n%v", err))
+				os.Exit(1)
+			}
+
+			styles.PrintSuccess(fmt.Sprintf("%d workspace(s) imported successfully!", len(workspaces)))
+			os.Exit(0)
+		}
+
 		if err := CreateWorkspaceCommand(); err != nil {
 			styles.PrintError(fmt.Sprintf("Failed to create workspace: %v", err))
 		}
@@ -91,4 +125,8 @@ var DeleteCmd = &cobra.Command{
 
 		styles.PrintSuccess(fmt.Sprintf("Workspace '%s' deleted successfully!", workspaceName))
 	},
+}
+
+func init() {
+	CreateCmd.Flags().StringP("from-json", "j", "", "Import workspaces from a JSON file or stdin (-)")
 }

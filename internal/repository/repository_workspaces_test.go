@@ -3,6 +3,7 @@ package repository
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/DieGopherLT/vscode-terminal-runner/internal/models"
@@ -363,5 +364,144 @@ func TestReplaceWorkspaceByName_returnsErrorForMissingName(t *testing.T) {
 	_, err := replaceWorkspaceByName(workspaces, "nonexistent", models.Workspace{})
 	if err == nil {
 		t.Fatal("expected an error for a missing workspace name")
+	}
+}
+
+// -- ImportWorkspaces and ValidateWorkspaceBatch tests --
+
+func TestImportWorkspaces_successOnFreshSystem(t *testing.T) {
+	defer redirectWorkspacesSaveFile(t)()
+
+	batch := []models.Workspace{
+		testutils.NewWorkspace().WithName("dev").Build(),
+		testutils.NewWorkspace().WithName("staging").Build(),
+	}
+
+	if err := ImportWorkspaces(batch); err != nil {
+		t.Fatalf("ImportWorkspaces returned unexpected error: %v", err)
+	}
+
+	workspaces, err := ReadWorkspaces()
+	if err != nil {
+		t.Fatalf("ReadWorkspaces after ImportWorkspaces returned unexpected error: %v", err)
+	}
+	if len(workspaces) != 2 {
+		t.Fatalf("expected 2 workspaces after import, got %d", len(workspaces))
+	}
+}
+
+func TestImportWorkspaces_emptyBatchIsNoOp(t *testing.T) {
+	defer redirectWorkspacesSaveFile(t)()
+
+	if err := ImportWorkspaces([]models.Workspace{}); err != nil {
+		t.Fatalf("ImportWorkspaces with empty batch returned unexpected error: %v", err)
+	}
+
+	workspaces, err := ReadWorkspaces()
+	if err != nil {
+		t.Fatalf("ReadWorkspaces returned unexpected error: %v", err)
+	}
+	if len(workspaces) != 0 {
+		t.Fatalf("expected 0 workspaces for empty batch, got %d", len(workspaces))
+	}
+}
+
+func TestImportWorkspaces_rejectsEmptyName(t *testing.T) {
+	defer redirectWorkspacesSaveFile(t)()
+
+	batch := []models.Workspace{{Name: ""}}
+	err := ImportWorkspaces(batch)
+	if err == nil {
+		t.Fatal("ImportWorkspaces should return an error for a workspace with empty name")
+	}
+	if !strings.Contains(err.Error(), "name is required") {
+		t.Fatalf("expected 'name is required' in error, got: %v", err)
+	}
+}
+
+func TestImportWorkspaces_rejectsDiskCollision(t *testing.T) {
+	defer redirectWorkspacesSaveFile(t)()
+
+	if err := SaveWorkspace(testutils.NewWorkspace().WithName("clash").Build()); err != nil {
+		t.Fatalf("setup SaveWorkspace failed: %v", err)
+	}
+
+	batch := []models.Workspace{testutils.NewWorkspace().WithName("clash").Build()}
+	err := ImportWorkspaces(batch)
+	if err == nil {
+		t.Fatal("ImportWorkspaces should return an error for a name that already exists on disk")
+	}
+	if !strings.Contains(err.Error(), "already exists on disk") {
+		t.Fatalf("expected 'already exists on disk' in error, got: %v", err)
+	}
+
+	workspaces, _ := ReadWorkspaces()
+	if len(workspaces) != 1 {
+		t.Fatalf("expected file unchanged (1 workspace) after collision rejection, got %d", len(workspaces))
+	}
+}
+
+func TestImportWorkspaces_rejectsIntraBatchCollision(t *testing.T) {
+	defer redirectWorkspacesSaveFile(t)()
+
+	batch := []models.Workspace{
+		testutils.NewWorkspace().WithName("dup").Build(),
+		testutils.NewWorkspace().WithName("dup").Build(),
+	}
+	err := ImportWorkspaces(batch)
+	if err == nil {
+		t.Fatal("ImportWorkspaces should return an error for duplicate names within the batch")
+	}
+	if !strings.Contains(err.Error(), "duplicate name in batch") {
+		t.Fatalf("expected 'duplicate name in batch' in error, got: %v", err)
+	}
+}
+
+func TestImportWorkspaces_writesNothingOnAnyError(t *testing.T) {
+	defer redirectWorkspacesSaveFile(t)()
+
+	if err := SaveWorkspace(testutils.NewWorkspace().WithName("pre-existing").Build()); err != nil {
+		t.Fatalf("setup SaveWorkspace failed: %v", err)
+	}
+
+	batch := []models.Workspace{
+		testutils.NewWorkspace().WithName("good").Build(),
+		{Name: ""},
+	}
+	if err := ImportWorkspaces(batch); err == nil {
+		t.Fatal("ImportWorkspaces should return an error when any entry is invalid")
+	}
+
+	workspaces, _ := ReadWorkspaces()
+	if len(workspaces) != 1 {
+		t.Fatalf("expected file unchanged (1 workspace) after partial error, got %d", len(workspaces))
+	}
+}
+
+func TestValidateWorkspaceBatch_returnsNilForValidBatch(t *testing.T) {
+	defer redirectWorkspacesSaveFile(t)()
+
+	batch := []models.Workspace{testutils.NewWorkspace().WithName("ok").Build()}
+	if err := ValidateWorkspaceBatch(batch); err != nil {
+		t.Fatalf("ValidateWorkspaceBatch returned unexpected error for a valid batch: %v", err)
+	}
+
+	workspaces, _ := ReadWorkspaces()
+	if len(workspaces) != 0 {
+		t.Fatalf("ValidateWorkspaceBatch should not write anything, but found %d workspaces", len(workspaces))
+	}
+}
+
+func TestValidateWorkspaceBatch_returnsErrorsWithoutWriting(t *testing.T) {
+	defer redirectWorkspacesSaveFile(t)()
+
+	batch := []models.Workspace{{Name: ""}}
+	if err := ValidateWorkspaceBatch(batch); err == nil {
+		t.Fatal("ValidateWorkspaceBatch should return an error for invalid batch")
+	}
+
+	workspaces, _ := ReadWorkspaces()
+	if len(workspaces) != 0 {
+		t.Fatalf("ValidateWorkspaceBatch should not write anything on error, but found %d workspaces", len(workspaces))
 	}
 }

@@ -2,7 +2,6 @@ package repository
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -18,8 +17,6 @@ var (
 	// tasksSaveFile holds the absolute path to the tasks.json file in the user's config directory.
 	TasksSaveFile string
 )
-
-type TasksBatchModel []models.Task
 
 func init() {
 	cfgFolder, err := os.UserConfigDir()
@@ -128,61 +125,6 @@ func SaveTask(task models.Task) error {
 // appendTask returns a new slice with task appended. Pure: no I/O.
 func appendTask(tasks []models.Task, task models.Task) []models.Task {
 	return append(tasks, task)
-}
-
-// SaveFromFile saves tasks from a given JSON file specified by a flag
-func SaveFromFile(path string) error {
-	ensureTasksSaveFile()
-	file, err := os.Open(path)
-	if err != nil {
-		return errors.New("failed to open file: " + err.Error())
-	}
-	defer file.Close()
-
-	var newTasks TasksBatchModel
-	err = json.NewDecoder(file).Decode(&newTasks)
-	if err != nil {
-		return errors.New("Incorrect file format: " + err.Error())
-	}
-
-	saveFile, err := os.Open(TasksSaveFile)
-	if err != nil {
-		return errors.New("failed to open existing tasks file: " + err.Error())
-	}
-
-	jsonBytes, err := io.ReadAll(saveFile)
-	saveFile.Close()
-	if err != nil {
-		return errors.New("failed to read existing tasks file: " + err.Error())
-	}
-
-	// An empty destination means zero existing tasks, not an error: a fresh
-	// install always starts with an empty tasks.json, and the batch must still
-	// import. Only decode when there is content to decode.
-	var content TaskSaveFileContent
-	if len(jsonBytes) > 0 {
-		if err = json.Unmarshal(jsonBytes, &content); err != nil {
-			return errors.New("failed to parse existing tasks file: " + err.Error())
-		}
-	}
-
-	content.Tasks = appendTaskBatch(content.Tasks, newTasks)
-	newJsonContent, err := json.Marshal(content)
-	if err != nil {
-		return errors.New("Error when saving tasks:" + err.Error())
-	}
-
-	err = os.WriteFile(TasksSaveFile, newJsonContent, 0666)
-	if err != nil {
-		return errors.New("Error when saving tasks:" + err.Error())
-	}
-
-	return nil
-}
-
-// appendTaskBatch returns a new slice with all items from batch appended. Pure: no I/O.
-func appendTaskBatch(tasks []models.Task, batch []models.Task) []models.Task {
-	return append(tasks, batch...)
 }
 
 // UpdateTask modifies an existing task in the local configuration file.

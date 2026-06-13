@@ -1,9 +1,9 @@
 package repository
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/DieGopherLT/vscode-terminal-runner/internal/models"
@@ -104,15 +104,6 @@ func TestAppendTask_addsToSlice(t *testing.T) {
 	}
 	if result[1].Name != "b" {
 		t.Fatalf("expected appended task name %q, got %q", "b", result[1].Name)
-	}
-}
-
-func TestAppendTaskBatch_appendsAll(t *testing.T) {
-	initial := []models.Task{{Name: "a"}}
-	batch := []models.Task{{Name: "b"}, {Name: "c"}}
-	result := appendTaskBatch(initial, batch)
-	if len(result) != 3 {
-		t.Fatalf("expected 3 tasks, got %d", len(result))
 	}
 }
 
@@ -328,109 +319,12 @@ func TestSaveTask_appendsWithoutDeduplication(t *testing.T) {
 	}
 }
 
-// -- SaveFromFile tests --
-
-func TestSaveFromFile_returnsErrorForNonexistentBatchFile(t *testing.T) {
-	defer redirectTasksSaveFile(t)()
-
-	err := SaveFromFile("/nonexistent/path/batch.json")
-	if err == nil {
-		t.Fatal("SaveFromFile should return an error for a nonexistent batch file")
-	}
-}
-
-func TestSaveFromFile_returnsErrorForMalformedBatchFile(t *testing.T) {
-	defer redirectTasksSaveFile(t)()
-
-	batchFile := filepath.Join(t.TempDir(), "bad.json")
-	if err := os.WriteFile(batchFile, []byte("{not an array}"), 0666); err != nil {
-		t.Fatalf("failed to write malformed batch file: %v", err)
-	}
-
-	err := SaveFromFile(batchFile)
-	if err == nil {
-		t.Fatal("SaveFromFile should return an error for a malformed batch file")
-	}
-}
-
-// TestSaveFromFile_succeedsWhenDestinationIsPrePopulated confirms that SaveFromFile
-// appends the batch to a destination tasks.json that already has existing content.
-func TestSaveFromFile_succeedsWhenDestinationIsPrePopulated(t *testing.T) {
-	defer redirectTasksSaveFile(t)()
-
-	// Pre-populate the destination with an existing task so it is not empty.
-	existing := testutils.NewTask().WithName("existing").Build()
-	if err := SaveTask(existing); err != nil {
-		t.Fatalf("setup SaveTask failed: %v", err)
-	}
-
-	batch := []models.Task{
-		testutils.NewTask().WithName("from-file-1").Build(),
-		testutils.NewTask().WithName("from-file-2").Build(),
-	}
-	batchBytes, _ := json.Marshal(batch)
-	batchFile := filepath.Join(t.TempDir(), "batch.json")
-	if err := os.WriteFile(batchFile, batchBytes, 0666); err != nil {
-		t.Fatalf("failed to write batch file: %v", err)
-	}
-
-	if err := SaveFromFile(batchFile); err != nil {
-		t.Fatalf("SaveFromFile returned unexpected error: %v", err)
-	}
-
-	tasks, err := ReadTasks()
-	if err != nil {
-		t.Fatalf("ReadTasks after SaveFromFile returned unexpected error: %v", err)
-	}
-	// 1 pre-existing + 2 from batch = 3
-	if len(tasks) != 3 {
-		t.Fatalf("expected 3 tasks after SaveFromFile, got %d", len(tasks))
-	}
-}
-
-// TestSaveFromFile_importsIntoFreshSystem confirms that a valid batch file
-// imports successfully when tasks.json is empty (the fresh-install state created
-// by ensureTasksSaveFile). An empty destination is treated as zero existing
-// tasks, not as an error. This is a regression guard for a previously fixed bug
-// where SaveFromFile returned "Provided file is empty" on any newly set-up system.
-func TestSaveFromFile_importsIntoFreshSystem(t *testing.T) {
-	defer redirectTasksSaveFile(t)()
-
-	// Fresh system: tasks.json starts empty.
-	batch := []models.Task{testutils.NewTask().WithName("from-file").Build()}
-	batchBytes, _ := json.Marshal(batch)
-	batchFile := filepath.Join(t.TempDir(), "batch.json")
-	if err := os.WriteFile(batchFile, batchBytes, 0666); err != nil {
-		t.Fatalf("failed to write batch file: %v", err)
-	}
-
-	if err := SaveFromFile(batchFile); err != nil {
-		t.Fatalf("SaveFromFile on a fresh system should succeed, got: %v", err)
-	}
-
-	tasks, err := ReadTasks()
-	if err != nil {
-		t.Fatalf("ReadTasks after SaveFromFile returned unexpected error: %v", err)
-	}
-	if len(tasks) != 1 {
-		t.Fatalf("expected 1 imported task on a fresh system, got %d", len(tasks))
-	}
-}
-
 // -- pure-transform edge cases --
 
 func TestAppendTask_onNilSliceCreatesNewSlice(t *testing.T) {
 	result := appendTask(nil, models.Task{Name: "first"})
 	if len(result) != 1 {
 		t.Fatalf("expected 1 task from nil base, got %d", len(result))
-	}
-}
-
-func TestAppendTaskBatch_onEmptyBatchReturnsUnchanged(t *testing.T) {
-	initial := []models.Task{{Name: "only"}}
-	result := appendTaskBatch(initial, []models.Task{})
-	if len(result) != 1 {
-		t.Fatalf("expected 1 task after empty batch append, got %d", len(result))
 	}
 }
 
@@ -446,5 +340,242 @@ func TestFilterOutTaskByName_onEmptySliceReturnsEmpty(t *testing.T) {
 	result := filterOutTaskByName(nil, "any")
 	if len(result) != 0 {
 		t.Fatalf("expected 0 tasks for nil input, got %d", len(result))
+	}
+}
+
+// -- ImportTasks and ValidateTaskBatch tests --
+
+func TestImportTasks_successOnFreshSystem(t *testing.T) {
+	defer redirectTasksSaveFile(t)()
+
+	batch := []models.Task{
+		testutils.NewTask().WithName("alpha").WithCmds("go run .").Build(),
+		testutils.NewTask().WithName("beta").WithCmds("make").Build(),
+	}
+
+	if err := ImportTasks(batch); err != nil {
+		t.Fatalf("ImportTasks returned unexpected error: %v", err)
+	}
+
+	tasks, err := ReadTasks()
+	if err != nil {
+		t.Fatalf("ReadTasks after ImportTasks returned unexpected error: %v", err)
+	}
+	if len(tasks) != 2 {
+		t.Fatalf("expected 2 tasks after import, got %d", len(tasks))
+	}
+}
+
+func TestImportTasks_appendsToExistingTasks(t *testing.T) {
+	defer redirectTasksSaveFile(t)()
+
+	if err := SaveTask(testutils.NewTask().WithName("existing").Build()); err != nil {
+		t.Fatalf("setup SaveTask failed: %v", err)
+	}
+
+	batch := []models.Task{testutils.NewTask().WithName("new-one").Build()}
+	if err := ImportTasks(batch); err != nil {
+		t.Fatalf("ImportTasks returned unexpected error: %v", err)
+	}
+
+	tasks, err := ReadTasks()
+	if err != nil {
+		t.Fatalf("ReadTasks returned unexpected error: %v", err)
+	}
+	if len(tasks) != 2 {
+		t.Fatalf("expected 2 tasks after import into populated file, got %d", len(tasks))
+	}
+}
+
+func TestImportTasks_emptyBatchIsNoOp(t *testing.T) {
+	defer redirectTasksSaveFile(t)()
+
+	if err := ImportTasks([]models.Task{}); err != nil {
+		t.Fatalf("ImportTasks with empty batch returned unexpected error: %v", err)
+	}
+
+	tasks, err := ReadTasks()
+	if err != nil {
+		t.Fatalf("ReadTasks returned unexpected error: %v", err)
+	}
+	if len(tasks) != 0 {
+		t.Fatalf("expected 0 tasks for empty batch, got %d", len(tasks))
+	}
+}
+
+func TestImportTasks_rejectsEmptyName(t *testing.T) {
+	defer redirectTasksSaveFile(t)()
+
+	batch := []models.Task{{Name: "", Cmds: []string{"echo hi"}}}
+	err := ImportTasks(batch)
+	if err == nil {
+		t.Fatal("ImportTasks should return an error for a task with empty name")
+	}
+	if !strings.Contains(err.Error(), "name is required") {
+		t.Fatalf("expected 'name is required' in error, got: %v", err)
+	}
+}
+
+func TestImportTasks_rejectsEmptyCmds(t *testing.T) {
+	defer redirectTasksSaveFile(t)()
+
+	batch := []models.Task{{Name: "no-cmds", Cmds: []string{}}}
+	err := ImportTasks(batch)
+	if err == nil {
+		t.Fatal("ImportTasks should return an error for a task with empty cmds")
+	}
+	if !strings.Contains(err.Error(), "cmds must not be empty") {
+		t.Fatalf("expected 'cmds must not be empty' in error, got: %v", err)
+	}
+}
+
+func TestImportTasks_rejectsDiskCollision(t *testing.T) {
+	defer redirectTasksSaveFile(t)()
+
+	if err := SaveTask(testutils.NewTask().WithName("clash").Build()); err != nil {
+		t.Fatalf("setup SaveTask failed: %v", err)
+	}
+
+	batch := []models.Task{testutils.NewTask().WithName("clash").Build()}
+	err := ImportTasks(batch)
+	if err == nil {
+		t.Fatal("ImportTasks should return an error for a name that already exists on disk")
+	}
+	if !strings.Contains(err.Error(), "already exists on disk") {
+		t.Fatalf("expected 'already exists on disk' in error, got: %v", err)
+	}
+
+	tasks, _ := ReadTasks()
+	if len(tasks) != 1 {
+		t.Fatalf("expected file unchanged (1 task) after collision rejection, got %d", len(tasks))
+	}
+}
+
+func TestImportTasks_rejectsIntraBatchCollision(t *testing.T) {
+	defer redirectTasksSaveFile(t)()
+
+	batch := []models.Task{
+		testutils.NewTask().WithName("dup").Build(),
+		testutils.NewTask().WithName("dup").Build(),
+	}
+	err := ImportTasks(batch)
+	if err == nil {
+		t.Fatal("ImportTasks should return an error for duplicate names within the batch")
+	}
+	if !strings.Contains(err.Error(), "duplicate name in batch") {
+		t.Fatalf("expected 'duplicate name in batch' in error, got: %v", err)
+	}
+}
+
+func TestImportTasks_reportsAllErrorsInOneBatch(t *testing.T) {
+	defer redirectTasksSaveFile(t)()
+
+	batch := []models.Task{
+		{Name: "", Cmds: []string{"ok"}},
+		{Name: "valid-name", Cmds: []string{}},
+	}
+	err := ImportTasks(batch)
+	if err == nil {
+		t.Fatal("ImportTasks should return errors for both invalid entries")
+	}
+	if !strings.Contains(err.Error(), "name is required") {
+		t.Fatalf("expected 'name is required' in error, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "cmds must not be empty") {
+		t.Fatalf("expected 'cmds must not be empty' in error, got: %v", err)
+	}
+}
+
+func TestImportTasks_rejectsInvalidIcon(t *testing.T) {
+	defer redirectTasksSaveFile(t)()
+
+	batch := []models.Task{
+		testutils.NewTask().WithName("bad-icon").WithIcon("not-a-real-icon").Build(),
+	}
+	err := ImportTasks(batch)
+	if err == nil {
+		t.Fatal("ImportTasks should return an error for an invalid icon")
+	}
+	if !strings.Contains(err.Error(), "not a valid VSCode icon") {
+		t.Fatalf("expected 'not a valid VSCode icon' in error, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "not-a-real-icon") {
+		t.Fatalf("expected icon name in error, got: %v", err)
+	}
+}
+
+func TestImportTasks_rejectsInvalidIconColor(t *testing.T) {
+	defer redirectTasksSaveFile(t)()
+
+	batch := []models.Task{
+		testutils.NewTask().WithName("bad-color").WithIconColor("not-a-real-color").Build(),
+	}
+	err := ImportTasks(batch)
+	if err == nil {
+		t.Fatal("ImportTasks should return an error for an invalid iconColor")
+	}
+	if !strings.Contains(err.Error(), "not a valid VSCode ANSI color") {
+		t.Fatalf("expected 'not a valid VSCode ANSI color' in error, got: %v", err)
+	}
+}
+
+func TestImportTasks_acceptsValidIconAndColor(t *testing.T) {
+	defer redirectTasksSaveFile(t)()
+
+	batch := []models.Task{
+		testutils.NewTask().WithName("styled").WithIcon("account").WithIconColor("terminal.ansiBlue").Build(),
+	}
+	if err := ImportTasks(batch); err != nil {
+		t.Fatalf("ImportTasks should accept a valid icon and iconColor, got: %v", err)
+	}
+}
+
+func TestImportTasks_writesNothingOnAnyError(t *testing.T) {
+	defer redirectTasksSaveFile(t)()
+
+	if err := SaveTask(testutils.NewTask().WithName("pre-existing").Build()); err != nil {
+		t.Fatalf("setup SaveTask failed: %v", err)
+	}
+
+	// One valid entry + one invalid entry — no write should occur.
+	batch := []models.Task{
+		testutils.NewTask().WithName("good").Build(),
+		{Name: "bad", Cmds: []string{}},
+	}
+	if err := ImportTasks(batch); err == nil {
+		t.Fatal("ImportTasks should return an error when any entry is invalid")
+	}
+
+	tasks, _ := ReadTasks()
+	if len(tasks) != 1 {
+		t.Fatalf("expected file unchanged (1 task) after partial error, got %d tasks", len(tasks))
+	}
+}
+
+func TestValidateTaskBatch_returnsNilForValidBatch(t *testing.T) {
+	defer redirectTasksSaveFile(t)()
+
+	batch := []models.Task{testutils.NewTask().WithName("ok").Build()}
+	if err := ValidateTaskBatch(batch); err != nil {
+		t.Fatalf("ValidateTaskBatch returned unexpected error for a valid batch: %v", err)
+	}
+
+	tasks, _ := ReadTasks()
+	if len(tasks) != 0 {
+		t.Fatalf("ValidateTaskBatch should not write anything, but found %d tasks", len(tasks))
+	}
+}
+
+func TestValidateTaskBatch_returnsErrorsWithoutWriting(t *testing.T) {
+	defer redirectTasksSaveFile(t)()
+
+	batch := []models.Task{{Name: "bad", Cmds: []string{}}}
+	if err := ValidateTaskBatch(batch); err == nil {
+		t.Fatal("ValidateTaskBatch should return an error for invalid batch")
+	}
+
+	tasks, _ := ReadTasks()
+	if len(tasks) != 0 {
+		t.Fatalf("ValidateTaskBatch should not write anything on error, but found %d tasks", len(tasks))
 	}
 }

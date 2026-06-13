@@ -10,7 +10,7 @@ Bubbletea TUI for task CRUD and execution. Exposes Cobra commands and interactiv
 
 - `task.go::NewModel` - TUI model constructor for create mode
 - `task.go::NewEditModel` - TUI model constructor for edit mode (pre-fills fields)
-- `task_commands.go::CreateCmd` - Cobra: interactive create or batch from `--file`
+- `task_commands.go::CreateCmd` - Cobra: interactive create or JSON batch import via `--from-json/-j`
 - `task_commands.go::ListCmd` - Cobra: tabular list or `--only-names` compact view
 - `task_commands.go::EditCmd` - Cobra: opens pre-filled form for existing task
 - `task_commands.go::DeleteCmd` - Cobra: deletes task by name
@@ -24,7 +24,7 @@ Bubbletea TUI for task CRUD and execution. Exposes Cobra commands and interactiv
 - **task.go**: `TaskModel` struct, field index constants, constructors, `newModelInternal`
 - **task_form.go**: `Init`, `Update`, `View` — core TUI loop, suggestion routing, key handling
 - **task_commands.go**: Cobra command definitions with flag registration
-- **task_create.go**: Validation (`isValidTask`), form-to-struct (`handleTaskCreation`), path expansion, `saveTask`, batch import
+- **task_create.go**: Validation (`isValidTask`), form-to-struct (`handleTaskCreation`), path expansion, `saveTask`
 - **task_list.go**: Tabular and name-only list rendering
 - **task_completion.go**: `completeTaskNames` — shell completion source; reads `repository.ReadTasks`, filters by `strings.HasPrefix` against the name, emits `"name\tcommands"`, returns `ShellCompDirectiveNoFileComp`. No discovery, no network.
 
@@ -55,14 +55,14 @@ Index `5` is the Submit button (navigation wraps 0..5).
 
 **Edit mode:** `isEditMode=true` + `originalTaskName` stored at init; `saveTask` calls `repository.UpdateTask(originalTaskName, ...)` so rename works correctly.
 
-**Batch create:** `--file <path>` skips TUI and calls `repository.SaveFromFile(path)` with a JSON array of tasks.
+**Batch import:** `--from-json/-j <path|->` skips TUI. Opens the source via `repository.OpenSource`, unmarshals a `[]models.Task`, calls `repository.ImportTasks` (all-or-nothing validation + write). Stdin supported by passing `-` as source.
 
 ## Dependencies
 
 **Internal:**
 
 - `internal/models`: `Task` struct
-- `internal/repository`: `SaveTask`, `UpdateTask`, `DeleteTask`, `FindTaskByName`, `SaveFromFile`
+- `internal/repository`: `SaveTask`, `UpdateTask`, `DeleteTask`, `FindTaskByName`, `OpenSource`, `ImportTasks`
 - `internal/vscode`: `NewSecureRunner` for task execution
 - `pkg/tui`: `FormNavigator` for field focus cycling
 - `pkg/tui/suggestions`: `Manager` (icon/color), `PathManager` (filesystem dirs)
@@ -134,4 +134,4 @@ This CLAUDE.md is my map for navigating this module. I commit to:
 - **Maintain truth** - outdated documentation is a critical bug
 - **Treat this as my compass** - if this map is wrong, I'm lost
 
-Last verified: 2026-06-12
+Last verified: 2026-06-13
