@@ -81,14 +81,7 @@ func ImportTasks(tasks []models.Task) error {
 		return errors.Join(errs...)
 	}
 
-	content := TaskSaveFileContent{Tasks: append(existing, tasks...)}
-	encoded, err := json.Marshal(content)
-	if err != nil {
-		return fmt.Errorf("ImportTasks: marshal: %w", err)
-	}
-
-	ensureTasksSaveFile()
-	return os.WriteFile(TasksSaveFile, encoded, 0666)
+	return taskRepo.WriteAll(append(existing, tasks...))
 }
 
 // ImportWorkspaces mirrors ImportTasks for workspaces (VAL-002, VAL-004, VAL-005).
@@ -102,14 +95,7 @@ func ImportWorkspaces(workspaces []models.Workspace) error {
 		return errors.Join(errs...)
 	}
 
-	content := WorkspaceSaveFileContent{Workspaces: append(existing, workspaces...)}
-	encoded, err := json.Marshal(content)
-	if err != nil {
-		return fmt.Errorf("ImportWorkspaces: marshal: %w", err)
-	}
-
-	ensureWorkspacesSaveFile()
-	return os.WriteFile(WorkspacesSaveFile, encoded, 0666)
+	return workspaceRepo.WriteAll(append(existing, workspaces...))
 }
 
 // collectTaskBatchErrors validates each task against existing disk state and intra-batch

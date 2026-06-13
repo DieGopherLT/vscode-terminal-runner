@@ -1,21 +1,20 @@
 package repository
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 	"os"
-	"path"
 	"path/filepath"
-	"strings"
 
 	"github.com/DieGopherLT/vscode-terminal-runner/internal/models"
 	"github.com/samber/lo"
 )
 
 var (
-	// tasksSaveFile holds the absolute path to the tasks.json file in the user's config directory.
+	// TasksSaveFile holds the absolute path to the tasks.json file in the user's config directory.
 	TasksSaveFile string
+
+	// taskRepo is the singleton generic repository backing every task adapter below.
+	taskRepo *JSONRepository[models.Task]
 )
 
 func init() {
@@ -24,146 +23,42 @@ func init() {
 		panic("could not determine user config directory: " + err.Error())
 	}
 	TasksSaveFile = filepath.Join(cfgFolder, "vscode-terminal-runner", "tasks.json")
-}
-
-// ensureTasksSaveFile creates the directory and the tasks file if they do not
-// exist yet. It is called lazily by every public function so that importing
-// this package no longer touches the filesystem at init time.
-func ensureTasksSaveFile() {
-	if _, err := os.Stat(TasksSaveFile); os.IsNotExist(err) {
-		if err := os.MkdirAll(filepath.Dir(TasksSaveFile), 0755); err != nil {
-			return
-		}
-		if _, err := os.Create(TasksSaveFile); err != nil {
-			return
-		}
-	}
-}
-
-// TaskSaveFileContent represents the structure of the task persistence file.
-type TaskSaveFileContent struct {
-	Tasks []models.Task `json:"tasks"`
+	taskRepo = NewTaskRepository(func() string { return TasksSaveFile })
 }
 
 // ReadTasks loads all tasks from the persistence file.
 func ReadTasks() ([]models.Task, error) {
-	ensureTasksSaveFile()
-	file, err := os.OpenFile(TasksSaveFile, os.O_RDWR|os.O_CREATE, 0666)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
+	return taskRepo.ReadAll()
+}
 
-	jsonContent, err := io.ReadAll(file)
-	if err != nil {
-		return nil, err
-	}
-
-	var content TaskSaveFileContent
-	if len(jsonContent) > 0 {
-		if err = json.Unmarshal(jsonContent, &content); err != nil {
-			return nil, err
-		}
-	}
-
-	return content.Tasks, nil
+// GetAllTasks retrieves all saved tasks.
+func GetAllTasks() ([]models.Task, error) {
+	return taskRepo.ReadAll()
 }
 
 // FindTaskByName retrieves a task by its name from the saved tasks.
 func FindTaskByName(name string) (*models.Task, error) {
-	tasks, err := ReadTasks()
-	if err != nil {
-		return nil, fmt.Errorf("failed to load tasks: %w", err)
-	}
-
-	task, found := lo.Find(tasks, func(task models.Task) bool {
-		return strings.EqualFold(task.Name, name)
-	})
-
-	if !found {
-		return nil, fmt.Errorf("task '%s' not found", name)
-	}
-
-	return &task, nil
+	return taskRepo.FindByName(name)
 }
 
 // SaveTask saves a task to the local configuration file.
 func SaveTask(task models.Task) error {
-	ensureTasksSaveFile()
-	if err := os.MkdirAll(path.Dir(TasksSaveFile), 0755); err != nil {
-		return err
-	}
+	return taskRepo.Save(task)
+}
 
-	file, err := os.OpenFile(TasksSaveFile, os.O_RDWR|os.O_CREATE, 0666)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
+// UpdateTask modifies an existing task in the local configuration file.
+func UpdateTask(originalName string, updatedTask models.Task) error {
+	return taskRepo.Update(originalName, updatedTask)
+}
 
-	jsonContent, err := io.ReadAll(file)
-	if err != nil {
-		return err
-	}
-
-	var content TaskSaveFileContent
-	if len(jsonContent) > 0 {
-		if err = json.Unmarshal(jsonContent, &content); err != nil {
-			return err
-		}
-	}
-
-	content.Tasks = appendTask(content.Tasks, task)
-
-	newJsonContent, err := json.Marshal(content)
-	if err != nil {
-		return err
-	}
-
-	return os.WriteFile(TasksSaveFile, newJsonContent, 0666)
+// DeleteTask removes a task from the local configuration file by name.
+func DeleteTask(name string) error {
+	return taskRepo.Delete(name)
 }
 
 // appendTask returns a new slice with task appended. Pure: no I/O.
 func appendTask(tasks []models.Task, task models.Task) []models.Task {
 	return append(tasks, task)
-}
-
-// UpdateTask modifies an existing task in the local configuration file.
-func UpdateTask(originalName string, updatedTask models.Task) error {
-	ensureTasksSaveFile()
-	if err := os.MkdirAll(path.Dir(TasksSaveFile), 0755); err != nil {
-		return err
-	}
-
-	file, err := os.OpenFile(TasksSaveFile, os.O_RDWR|os.O_CREATE, 0666)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	jsonContent, err := io.ReadAll(file)
-	if err != nil {
-		return err
-	}
-
-	var content TaskSaveFileContent
-	if len(jsonContent) > 0 {
-		if err = json.Unmarshal(jsonContent, &content); err != nil {
-			return err
-		}
-	}
-
-	updated, err := replaceTaskByName(content.Tasks, originalName, updatedTask)
-	if err != nil {
-		return err
-	}
-	content.Tasks = updated
-
-	newJsonContent, err := json.Marshal(content)
-	if err != nil {
-		return err
-	}
-
-	return os.WriteFile(TasksSaveFile, newJsonContent, 0666)
 }
 
 // replaceTaskByName returns a copy of tasks with the entry matching originalName
@@ -187,53 +82,10 @@ func replaceTaskByName(tasks []models.Task, originalName string, updatedTask mod
 	return result, nil
 }
 
-// DeleteTask removes a task from the local configuration file by name.
-func DeleteTask(name string) error {
-	ensureTasksSaveFile()
-	if err := os.MkdirAll(path.Dir(TasksSaveFile), 0755); err != nil {
-		return err
-	}
-
-	file, err := os.OpenFile(TasksSaveFile, os.O_RDWR|os.O_CREATE, 0666)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	jsonContent, err := io.ReadAll(file)
-	if err != nil {
-		return err
-	}
-
-	var content TaskSaveFileContent
-	if len(jsonContent) > 0 {
-		if err = json.Unmarshal(jsonContent, &content); err != nil {
-			return err
-		}
-	}
-
-	content.Tasks = filterOutTaskByName(content.Tasks, name)
-
-	encoded, err := json.Marshal(content)
-	if err != nil {
-		return err
-	}
-
-	file.Truncate(0)
-	file.Seek(0, 0)
-	_, err = file.Write(encoded)
-	return err
-}
-
 // filterOutTaskByName returns a copy of tasks without the entry whose Name equals name.
 // Pure: no I/O.
 func filterOutTaskByName(tasks []models.Task, name string) []models.Task {
 	return lo.Filter(tasks, func(task models.Task, _ int) bool {
 		return task.Name != name
 	})
-}
-
-// GetAllTasks retrieves all saved tasks.
-func GetAllTasks() ([]models.Task, error) {
-	return ReadTasks()
 }
