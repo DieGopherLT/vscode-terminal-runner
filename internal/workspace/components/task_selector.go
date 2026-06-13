@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/DieGopherLT/vscode-terminal-runner/internal/models"
+	"github.com/DieGopherLT/vscode-terminal-runner/pkg/collections"
 	"github.com/DieGopherLT/vscode-terminal-runner/pkg/styles"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -25,7 +26,7 @@ const (
 // TaskSelector provides multi-select functionality for tasks with search capabilities.
 type TaskSelector struct {
 	availableTasks []models.Task
-	selectedTasks  map[string]bool
+	selectedTasks  *collections.Set[string]
 	filteredTasks  []models.Task
 	focusedIndex   int
 	searchInput    textinput.Model
@@ -42,7 +43,7 @@ func NewTaskSelector(availableTasks []models.Task) *TaskSelector {
 
 	return &TaskSelector{
 		availableTasks: availableTasks,
-		selectedTasks:  make(map[string]bool),
+		selectedTasks:  collections.NewSet[string](),
 		filteredTasks:  availableTasks,
 		focusedIndex:   0,
 		searchInput:    searchInput,
@@ -65,27 +66,21 @@ func (ts *TaskSelector) containerWidth() int {
 // GetSelectedTasks returns a slice of currently selected tasks.
 func (ts *TaskSelector) GetSelectedTasks() []models.Task {
 	return lo.Filter(ts.availableTasks, func(task models.Task, _ int) bool {
-		return ts.selectedTasks[task.Name]
+		return ts.selectedTasks.Contains(task.Name)
 	})
 }
 
 // SetSelectedTasks sets the initially selected tasks.
 func (ts *TaskSelector) SetSelectedTasks(tasks []models.Task) {
-	ts.selectedTasks = make(map[string]bool)
+	ts.selectedTasks = collections.NewSet[string]()
 	for _, task := range tasks {
-		ts.selectedTasks[task.Name] = true
+		ts.selectedTasks.Add(task.Name)
 	}
 }
 
 // GetSelectedCount returns the number of currently selected tasks.
 func (ts *TaskSelector) GetSelectedCount() int {
-	count := 0
-	for _, isSelected := range ts.selectedTasks {
-		if isSelected {
-			count++
-		}
-	}
-	return count
+	return ts.selectedTasks.Len()
 }
 
 // ToggleSearch toggles the search input visibility and focus.
@@ -109,14 +104,14 @@ func (ts *TaskSelector) IsInSearchMode() bool {
 // SelectAll selects all currently visible (filtered) tasks.
 func (ts *TaskSelector) SelectAll() {
 	for _, task := range ts.filteredTasks {
-		ts.selectedTasks[task.Name] = true
+		ts.selectedTasks.Add(task.Name)
 	}
 }
 
 // DeselectAll deselects all currently visible (filtered) tasks.
 func (ts *TaskSelector) DeselectAll() {
 	for _, task := range ts.filteredTasks {
-		delete(ts.selectedTasks, task.Name)
+		ts.selectedTasks.Remove(task.Name)
 	}
 }
 
@@ -128,7 +123,7 @@ func (ts *TaskSelector) ToggleSelected() {
 
 	if ts.focusedIndex >= 0 && ts.focusedIndex < len(ts.filteredTasks) {
 		task := ts.filteredTasks[ts.focusedIndex]
-		ts.selectedTasks[task.Name] = !ts.selectedTasks[task.Name]
+		ts.selectedTasks.Toggle(task.Name)
 	}
 }
 
@@ -257,7 +252,7 @@ func (ts *TaskSelector) renderTaskList() string {
 func (ts *TaskSelector) renderTaskItem(task models.Task, index int) string {
 	// Checkbox state
 	checkbox := "☐"
-	if ts.selectedTasks[task.Name] {
+	if ts.selectedTasks.Contains(task.Name) {
 		checkbox = "☑"
 	}
 
@@ -268,7 +263,7 @@ func (ts *TaskSelector) renderTaskItem(task models.Task, index int) string {
 	if index == ts.focusedIndex {
 		focusPrefix = "▶ "
 		itemStyle = styles.FocusedTaskStyle
-	} else if ts.selectedTasks[task.Name] {
+	} else if ts.selectedTasks.Contains(task.Name) {
 		itemStyle = styles.SelectedTaskStyle
 	}
 
