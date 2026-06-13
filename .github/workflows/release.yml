@@ -1,0 +1,45 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Run tests
+        run: go test ./...
+
+      - name: Build binaries
+        run: |
+          GOOS=linux  GOARCH=amd64 go build -o bin/vstr-linux-amd64  .
+          GOOS=darwin GOARCH=amd64 go build -o bin/vstr-darwin-amd64 .
+          GOOS=darwin GOARCH=arm64 go build -o bin/vstr-darwin-arm64 .
+
+      - name: Extract release notes
+        run: |
+          awk '/^## \['"${GITHUB_REF_NAME}"'\]/{found=1; next} found && /^## \[/{exit} found{print}' CHANGELOG.md > release-notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        with:
+          body_path: release-notes.md
+          files: |
+            bin/vstr-linux-amd64
+            bin/vstr-darwin-amd64
+            bin/vstr-darwin-arm64
