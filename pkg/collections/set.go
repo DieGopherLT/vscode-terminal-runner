@@ -30,13 +30,13 @@ func (s *Set[T]) Contains(item T) bool {
 }
 
 // Toggle flips the membership of item: it is removed when present and added
-// when absent.
+// when absent, with a single map lookup.
 func (s *Set[T]) Toggle(item T) {
-	if s.Contains(item) {
-		s.Remove(item)
+	if _, found := s.items[item]; found {
+		delete(s.items, item)
 		return
 	}
-	s.Add(item)
+	s.items[item] = struct{}{}
 }
 
 // Len returns the number of elements currently in the set.

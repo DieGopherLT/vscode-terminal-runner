@@ -135,10 +135,9 @@ func (r *JSONRepository[T]) Update(originalName string, updated T) error {
 		return fmt.Errorf("%s '%s' not found", r.entityLabel, originalName)
 	}
 
-	result := make([]T, len(items))
-	copy(result, items)
-	result[index] = updated
-	return r.WriteAll(result)
+	// items is freshly read and owned by this call, so it is safe to mutate in place.
+	items[index] = updated
+	return r.WriteAll(items)
 }
 
 // Delete removes the item whose name equals name, matching case-sensitively.
