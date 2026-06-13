@@ -40,8 +40,8 @@ vstr (CLI) --> Runner --> client.Client --> HTTP --> VSTR-Bridge Extension --> V
 
 | Package              | Responsibility                                                     |
 | -------------------- | ------------------------------------------------------------------ |
-| `internal/models`    | Data types: `Task`, `Workspace`, `Config`                          |
-| `internal/repository`| JSON file persistence for tasks and workspaces                     |
+| `internal/models`    | Data types: `Task`, `Workspace`, `Config` (each impl `GetName()`)  |
+| `internal/repository`| JSON persistence via generic `JSONRepository[T NamedEntity]`        |
 | `internal/cfg`       | App config file, setup wizard, extension install                   |
 | `internal/vscode`    | Bridge discovery and `Runner` orchestration                        |
 | `internal/client`    | `Client` — auth-aware HTTP client for bridge                       |
@@ -51,6 +51,7 @@ vstr (CLI) --> Runner --> client.Client --> HTTP --> VSTR-Bridge Extension --> V
 | `pkg/tui`            | Reusable `FormNavigator` and `suggestions.Manager` for TUI forms   |
 | `pkg/messages`       | `MessageManager` — collects error/success messages shown in TUI    |
 | `pkg/styles`         | Lipgloss styles, VSCode icon list, ANSI color list                 |
+| `pkg/collections`    | Generic `Set[T comparable]` (used by the workspace task selector)  |
 | `pkg/testutils`      | Shared test helpers                                                |
 
 ### Data Persistence
@@ -60,6 +61,14 @@ Tasks and workspaces are stored as JSON in the user config directory:
 - `$XDG_CONFIG_HOME/vscode-terminal-runner/tasks.json`
 - `$XDG_CONFIG_HOME/vscode-terminal-runner/workspaces.json`
 - `$XDG_CONFIG_HOME/vscode-terminal-runner/config.json`
+
+Both `tasks.json` and `workspaces.json` are persisted by a single generic
+`JSONRepository[T NamedEntity]` (`internal/repository/repository.go`). The public
+funcs (`ReadTasks`, `SaveWorkspace`, …) are thin adapters over package-level
+`taskRepo`/`workspaceRepo` singletons wired in `init()`. The save-file path is
+resolved lazily (`getSaveFile func() string`) so tests can redirect it after
+`init()`. The Task-allows-duplicates / Workspace-rejects-duplicates asymmetry is
+the injected `onAppend` strategy. Set `XDG_CONFIG_HOME` to isolate the store.
 
 ### Bridge Discovery
 
@@ -100,4 +109,4 @@ This CLAUDE.md is my map for navigating this module. I commit to:
 - **Maintain truth** - outdated documentation is a critical bug
 - **Treat this as my compass** - if this map is wrong, I'm lost
 
-Last verified: 2026-06-04
+Last verified: 2026-06-13
