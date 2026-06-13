@@ -2,6 +2,7 @@ package repository
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -75,7 +76,9 @@ func NewWorkspaceRepository(getSaveFile func() string) *JSONRepository[models.Wo
 // ReadAll loads every persisted item, creating the backing file on first use.
 // An empty file yields (nil, nil); malformed JSON returns the unmarshal error.
 func (r *JSONRepository[T]) ReadAll() ([]T, error) {
-	r.ensure()
+	if err := r.ensure(); err != nil {
+		return nil, err
+	}
 
 	data, err := os.ReadFile(r.getSaveFile())
 	if err != nil {
@@ -163,7 +166,9 @@ func (r *JSONRepository[T]) Delete(name string) error {
 
 // WriteAll replaces the whole file with items, serialized as {jsonKey: items}.
 func (r *JSONRepository[T]) WriteAll(items []T) error {
-	r.ensure()
+	if err := r.ensure(); err != nil {
+		return err
+	}
 
 	content := map[string][]T{r.jsonKey: items}
 	encoded, err := json.Marshal(content)
@@ -175,16 +180,24 @@ func (r *JSONRepository[T]) WriteAll(items []T) error {
 }
 
 // ensure creates the config directory and an empty save file if either is
-// missing, so the first read or write on a fresh system does not fail.
-func (r *JSONRepository[T]) ensure() {
+// missing, so the first read or write on a fresh system does not fail. A Stat
+// failure other than "does not exist" (e.g. a permissions error) is surfaced
+// rather than swallowed, so callers fail fast with actionable context.
+func (r *JSONRepository[T]) ensure() error {
 	saveFile := r.getSaveFile()
-	if _, err := os.Stat(saveFile); !os.IsNotExist(err) {
-		return
+	_, err := os.Stat(saveFile)
+	if err == nil {
+		return nil
 	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("ensure: stat %q: %w", saveFile, err)
+	}
+
 	if err := os.MkdirAll(filepath.Dir(saveFile), 0755); err != nil {
-		return
+		return fmt.Errorf("ensure: create config dir for %q: %w", saveFile, err)
 	}
 	if _, err := os.Create(saveFile); err != nil {
-		return
+		return fmt.Errorf("ensure: create save file %q: %w", saveFile, err)
 	}
+	return nil
 }
