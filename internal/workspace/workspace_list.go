@@ -106,10 +106,19 @@ func longestTaskName(tasks []models.Task) int {
 	return longest
 }
 
-// abbreviateHome replaces a leading home prefix in path with "~", matching the
-// path display used by `vstr task list`. home is read once by the caller.
+// abbreviateHome replaces a leading $HOME path segment in path with "~",
+// matching the path display used by `vstr task list`. The match requires a
+// path-component boundary so that, with HOME=/home/user, /home/user/proj
+// abbreviates to ~/proj while /home/userdata is left untouched. home is read
+// once by the caller.
 func abbreviateHome(home, path string) string {
-	if home != "" && strings.HasPrefix(path, home) {
+	if home == "" {
+		return path
+	}
+	if path == home {
+		return "~"
+	}
+	if strings.HasPrefix(path, home+string(os.PathSeparator)) {
 		return "~" + strings.TrimPrefix(path, home)
 	}
 	return path
