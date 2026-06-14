@@ -34,14 +34,24 @@ var RunCmd = &cobra.Command{
 	},
 }
 
-// listWorkspacesCmd lists all saved workspaces
+// ListCmd lists all saved workspaces with their tasks, working directories and commands.
 var ListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all workspaces",
-	Long:  `Display a list of all configured workspaces`,
+	Long:  `Display all configured workspaces with their tasks, working directories and commands`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// TODO: Implement workspace listing
-		styles.PrintInfo("Workspace listing not yet implemented")
+		onlyNames, _ := cmd.Flags().GetBool("only-names")
+
+		if onlyNames {
+			if err := listAllWorkspaceNames(); err != nil {
+				fmt.Println("Error listing workspace names:", err)
+			}
+			return
+		}
+
+		if err := listAllWorkspaces(); err != nil {
+			fmt.Println("Error listing workspaces:", err)
+		}
 	},
 }
 
@@ -113,5 +123,6 @@ var DeleteCmd = &cobra.Command{
 }
 
 func init() {
+	ListCmd.Flags().BoolP("only-names", "n", false, "List only workspace names")
 	CreateCmd.Flags().StringP("from-json", "j", "", "Import workspaces from a JSON file or stdin (-)")
 }

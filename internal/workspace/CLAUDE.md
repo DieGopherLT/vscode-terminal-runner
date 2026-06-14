@@ -12,7 +12,9 @@ Bubbletea TUI for workspace CRUD and execution. A workspace is a named group of 
 - `workspace_commands.go::EditCmd` - Cobra: opens pre-filled TUI for an existing workspace
 - `workspace_commands.go::DeleteCmd` - Cobra: deletes workspace by name (guards existence first)
 - `workspace_commands.go::RunCmd` - Cobra: runs workspace by name via `SecureRunner`
-- `workspace_commands.go::ListCmd` - Cobra: lists workspaces (stub, not yet implemented)
+- `workspace_commands.go::ListCmd` - Cobra: lists workspaces with their tasks (working dirs + commands); `--only-names/-n` for a compact name list
+- `workspace_list.go::listAllWorkspaces` - Grouped-section renderer: workspace -> tasks (name + path) -> commands
+- `workspace_list.go::listAllWorkspaceNames` - Bullet list of workspace names (`--only-names` view)
 - `workspace_form.go::NewWorkspaceModel` - TUI model constructor for create mode
 - `workspace_form.go::NewEditWorkspaceModel` - TUI model constructor for edit mode (pre-fills fields)
 - `workspace_create.go::CreateWorkspaceCommand` - Wraps TUI program; entry point from CLI
@@ -25,6 +27,7 @@ Bubbletea TUI for workspace CRUD and execution. A workspace is a named group of 
 - **workspace_form.go**: `WorkspaceModel` struct; `Init`, `Update`, `View`; validation; save logic
 - **workspace_commands.go**: Cobra command definitions with argument validation
 - **workspace_create.go**: Runs `tea.NewProgram`; bridges CLI args to TUI
+- **workspace_list.go**: Non-interactive stdout renderers (`listAllWorkspaces`, `listAllWorkspaceNames`); `$HOME`-to-`~` path abbreviation; per-workspace task-name column alignment
 - **workspace_completion.go**: `completeWorkspaceNames` — shell completion source; reads `repository.ReadWorkspaces`, filters by `strings.HasPrefix` against the name, emits `"name\ttask-names"` (a workspace has no command/path of its own), returns `ShellCompDirectiveNoFileComp`. No discovery, no network.
 - **components/task_selector.go**: `TaskSelector`; search, filter, toggle, select-all, scroll
 
@@ -143,4 +146,4 @@ This CLAUDE.md is my map for navigating this module. I commit to:
 - **Maintain truth** - outdated documentation is a critical bug
 - **Treat this as my compass** - if this map is wrong, I'm lost
 
-Last verified: 2026-06-12
+Last verified: 2026-06-14
